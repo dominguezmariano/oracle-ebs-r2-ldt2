@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+{% block title %}Download Manager{% endblock %}
+{% block page_title %}Download Manager{% endblock %}
+
+{% block content %}
+
+<!-- ═══ BARRA DE CREDENCIALES ═══ -->
+<div class="r2-card" style="margin-bottom:1rem">
+  <div class="r2-card-header" style="margin-bottom:.8rem">
+    <svg viewBox="0 0 24 24" fill="#1565C0" width="18"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+    <h2>Conexión Oracle EBS</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem;align-items:end">
+    <div class="r2-form-group" style="margin:0">
+      <label>Ambiente *</label>
+      <select id="cred-ambiente">
+        <option value="">Seleccionar ambiente...</option>
+        {% for a in ambientes %}
+        <option value="{{ a.id }}" data-label="{{ a.nombre }} — {{ a.service_name }}">{{ a.nombre }} — {{ a.host }}:{{ a.puerto }}/{{ a.service_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="r2-form-group" style="margin:0">
+      <label>Usuario DB *</label>
+      <input id="cred-user" placeholder="ej: APPS">
+    </div>
+    <div class="r2-form-group" style="margin:0">
+      <label>Contraseña DB *</label>
+      <input id="cred-pass" type="password" placeholder="••••••">
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LAYOUT PRINCIPAL: FORM + DOS GRILLAS ═══ -->
+<div style="display:grid;grid-template-columns:280px 1fr;gap:1rem;align-items:start">
+
+  <!-- COLUMNA IZQUIERDA: Formulario de búsqueda -->
+  <div>
+    <div class="r2-card">
+      <div class="r2-card-header" style="margin-bottom:.8rem">
+        <svg viewBox="0 0 24 24" fill="#1565C0" width="18"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <h2>Búsqueda</h2>
+      </div>
+
+      <div class="r2-form-group">
+        <label>Tipo de objeto *</label>
+        <select id="f-tipo" onchange="onTipoChange(this.value)">
+          <option value="">Seleccionar...</option>
+          {% for code, desc in tipos.items() %}
+          <option value="{{ code }}">{{ desc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="r2-form-group">
+        <label>Aplicación EBS</label>
+        <select id="f-app">
+          <option value="">— Todas —</option>
+          {% for a in aplicaciones %}
+          <option value="{{ a.short_name }}">{{ a.short_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="r2-form-group">
+        <label>Nombre objeto <span style="font-weight:400;color:#90A4AE;font-size:.75rem">(soporta % como wildcard)</span></label>
+        <input id="f-obj" placeholder="ej: XX% o nombre exacto">
+      </div>
+
+      <div style="border-top:1px solid #ECEFF1;padding-top:.8rem;margin-top:.2rem">
+        <div style="font-size:.72rem;font-weight:700;color:#90A4AE;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.6rem">Campos adicionales</div>
+        <div class="r2-form-group">
+          <label id="lbl-add1" style="color:#78909C">Adicional 1</label>
+          <input id="f-add1" placeholder="">
+        </div>
+        <div class="r2-form-group">
+          <label id="lbl-add2" style="color:#78909C">Adicional 2</label>
+          <input id="f-add2" placeholder="">
+        </div>
+        <div class="r2-form-group">
+          <label id="lbl-add3" style="color:#78909C">Adicional 3</label>
+          <input id="f-add3" placeholder="">
+        </div>
+        <div class="r2-form-group" style="margin-bottom:0">
+          <label id="lbl-add4" style="color:#78909C">Adicional 4</label>
+          <input id="f-add4" placeholder="">
+        </div>
+      </div>
+
+      <div style="margin-top:1rem;display:flex;flex-direction:column;gap:.5rem">
+        <button class="btn-r2 btn-primary" style="justify-content:center;width:100%" onclick="buscar()">
+          <svg viewBox="0 0 24 24" fill="white" width="16"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          Buscar en EBS
+        </button>
+        <button class="btn-r2 btn-outline" style="justify-content:center;width:100%;font-size:.78rem" onclick="limpiarBusqueda()">Limpiar</button>
+      </div>
+    </div>
+
+    <!-- Info tipo seleccionado -->
+    <div id="tipo-info" class="r2-card" style="display:none;margin-top:0;background:#1A2226;border:1px solid rgba(41,182,246,.2)">
+      <div style="font-size:.72rem;font-weight:700;color:#29B6F6;letter-spacing:.08em;margin-bottom:.4rem">TIPO SELECCIONADO</div>
+      <div id="tipo-info-text" style="color:#B0BEC5;font-size:.82rem;line-height:1.5"></div>
+    </div>
+  </div>
+
+  <!-- COLUMNA DERECHA: Grillas -->
+  <div style="display:flex;flex-direction:column;gap:1rem">
+
+    <!-- GRILLA 1: Resultados -->
+    <div class="r2-card">
+      <div class="r2-card-header" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <svg viewBox="0 0 24 24" fill="#1565C0" width="18"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+          <h2>Resultados</h2>
+          <span id="result-count" style="background:#E3F2FD;color:#1565C0;border-radius:20px;padding:.15rem .65rem;font-size:.72rem;font-weight:600;display:none">0</span>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <button class="btn-r2 btn-accent btn-sm" onclick="agregarTodos()" id="btn-agregar-todos" style="display:none">
+            Agregar todos →
+          </button>
+          <button class="btn-r2 btn-outline btn-sm" onclick="agregarSeleccionados()" id="btn-agregar-sel" style="display:none">
+            Agregar selección →
+          </button>
+        </div>
+      </div>
+
+      <!-- Estado inicial -->
+      <div id="results-placeholder" style="color:#90A4AE;font-size:.875rem;padding:.5rem 0;text-align:center">
+        Completá la búsqueda para ver los objetos EBS disponibles.
+      </div>
+
+      <!-- Loading -->
+      <div id="results-loading" style="display:none;text-align:center;padding:1.5rem">
+        <div style="display:inline-block;width:32px;height:32px;border:3px solid #E3F2FD;border-top-color:#1565C0;border-radius:50%;animation:spin .8s linear infinite"></div>
+        <div style="margin-top:.5rem;color:#78909C;font-size:.82rem">Consultando Oracle EBS...</div>
+      </div>
+
+      <!-- Error -->
+      <div id="results-error" class="r2-alert danger" style="display:none"></div>
+
+      <!-- Tabla resultados -->
+      <div id="results-container" style="display:none;max-height:380px;overflow-y:auto;overflow-x:auto;border:1px solid #ECEFF1;border-radius:6px">
+        <table class="r2-table" id="results-table" style="margin:0;border:none">
+          <thead style="position:sticky;top:0;z-index:2;background:#F5F7FA">
+            <tr>
+              <th style="width:32px;border-top:none"><input type="checkbox" id="chk-all" onchange="toggleAll(this)" title="Seleccionar todos"></th>
+              <th style="border-top:none;width:70px">App</th>
+              <th style="border-top:none;width:180px">Clave (OBJ_TYPE)</th>
+              <th style="border-top:none;width:200px">Nombre</th>
+              <th style="border-top:none">Descripción</th>
+              <th style="border-top:none;width:130px">Info adicional</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GRILLA 2: Objetos seleccionados -->
+    <div class="r2-card">
+      <div class="r2-card-header" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <svg viewBox="0 0 24 24" fill="#26A69A" width="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <h2>Para generar</h2>
+          <span id="sel-count" style="background:#E8F5E9;color:#2E7D32;border-radius:20px;padding:.15rem .65rem;font-size:.72rem;font-weight:600;display:none">0</span>
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-r2 btn-danger btn-sm" onclick="limpiarSeleccion()" id="btn-limpiar-sel" style="display:none">
+            Limpiar selección
+          </button>
+          <button class="btn-r2 btn-primary" onclick="generarSentencias()" id="btn-generar" style="display:none">
+            <svg viewBox="0 0 24 24" fill="white" width="16"><path d="M8 5v14l11-7z"/></svg>
+            Generar FNDLOAD
+          </button>
+        </div>
+      </div>
+
+      <div id="sel-placeholder" style="color:#90A4AE;font-size:.875rem;padding:.5rem 0;text-align:center">
+        Los objetos seleccionados aparecerán aquí.
+      </div>
+
+      <div id="sel-container" style="display:none;overflow-x:auto">
+        <table class="r2-table" id="sel-table">
+          <thead>
+            <tr>
+              <th>OBJ_CODE</th>
+              <th>App</th>
+              <th>Clave (OBJ_TYPE)</th>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th style="width:36px"></th>
+            </tr>
+          </thead>
+          <tbody id="sel-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PANEL DE SENTENCIAS GENERADAS -->
+    <div id="gen-panel" style="display:none">
+      <div class="r2-card">
+        <div class="r2-card-header" style="justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <svg viewBox="0 0 24 24" fill="#1565C0" width="18"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10z"/></svg>
+            <h2>Sentencias FNDLOAD generadas</h2>
+          </div>
+          <button class="btn-r2 btn-outline btn-sm" onclick="copiarTodas()">Copiar todas</button>
+        </div>
+        <div id="gen-list" style="display:flex;flex-direction:column;gap:.75rem"></div>
+      </div>
+    </div>
+
+  </div><!-- fin columna derecha -->
+</div><!-- fin layout principal -->
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Estado global ──────────────────────────────────────────────
+let selectedItems = [];  // objetos en la grilla de selección
+
+// ── Hints de campos adicionales por tipo ───────────────────────
+const ADDITIONAL_HINTS = {{ {
+  'FORMPERS':          ['Secuencia', 'Nombre del Form', '', ''],
+  'MENU_ENTRY':        ['Menú padre', 'Function Name', 'Sub-menu', 'Entry Sequence'],
+  'PROFILES':          ['Nivel (RESPONSIBILITY/APPLICATION)', 'Valor del nivel', 'Mostrar valores (Y/N)', 'Valor del profile'],
+  'REQUESTGRPU':       ['Tipo de unidad (P/S/A)', 'Nombre prog/set', '', ''],
+  'DESCFLEXS_CTXT':    ['Context Code', '', '', ''],
+  'DESCFLEXS_CTXT_ATT':['Context Code', 'End User Column', 'App Column', 'Col Seq Num'],
+} | tojson }};
+
+function onTipoChange(code) {
+  const hints = ADDITIONAL_HINTS[code] || ['', '', '', ''];
+  ['1','2','3','4'].forEach((n, i) => {
+    document.getElementById(`lbl-add${n}`).textContent = hints[i] || `Adicional ${n}`;
+    document.getElementById(`f-add${n}`).placeholder   = hints[i] ? `ej: ${hints[i]}` : '';
+  });
+  const infoEl = document.getElementById('tipo-info');
+  const textEl = document.getElementById('tipo-info-text');
+  if (code) {
+    infoEl.style.display = 'block';
+    textEl.textContent = `Tipo: ${code}`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+}
+
+// ── Buscar ─────────────────────────────────────────────────────
+async function buscar() {
+  const ambienteId = document.getElementById('cred-ambiente').value;
+  const user       = document.getElementById('cred-user').value.trim();
+  const pass       = document.getElementById('cred-pass').value.trim();
+  const typeCode   = document.getElementById('f-tipo').value;
+
+  if (!ambienteId || !user || !pass || !typeCode) {
+    showResultsError('Completá: ambiente, usuario, contraseña y tipo de objeto.');
+    return;
+  }
+
+  showResultsLoading();
+
+  const payload = {
+    ambiente_id:   ambienteId,
+    db_user:       user,
+    db_pass:       pass,
+    type_code:     typeCode,
+    app_short_name: document.getElementById('f-app').value,
+    obj_type:       document.getElementById('f-obj').value,
+    additional_1:   document.getElementById('f-add1').value,
+    additional_2:   document.getElementById('f-add2').value,
+    additional_3:   document.getElementById('f-add3').value,
+    additional_4:   document.getElementById('f-add4').value,
+  };
+
+  try {
+    const resp = await fetch('/download/buscar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      showResultsError(data.error || 'Error en la búsqueda.');
+      return;
+    }
+    renderResults(data.items || []);
+  } catch (e) {
+    showResultsError('Error de red: ' + e.message);
+  }
+}
+
+// ── Render resultados ──────────────────────────────────────────
+function renderResults(items) {
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = '';
+
+  if (items.length === 0) {
+    document.getElementById('results-placeholder').style.display = 'block';
+    document.getElementById('results-placeholder').textContent   = 'No se encontraron objetos con los filtros indicados.';
+    document.getElementById('results-container').style.display = 'none';
+    document.getElementById('results-loading').style.display  = 'none';
+    document.getElementById('results-error').style.display    = 'none';
+    document.getElementById('result-count').style.display     = 'none';
+    document.getElementById('btn-agregar-todos').style.display = 'none';
+    document.getElementById('btn-agregar-sel').style.display   = 'none';
+    return;
+  }
+
+  items.forEach((item, idx) => {
+    const adds = [item.ADDITIONAL_1, item.ADDITIONAL_2, item.ADDITIONAL_3, item.ADDITIONAL_4]
+      .filter(v => v && String(v).trim())
+      .map(v => `<span style="display:inline-block;background:#EEF2FF;color:#3949AB;border-radius:3px;padding:.1rem .35rem;font-size:.7rem;margin:.1rem .1rem 0 0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(v)}">${esc(v)}</span>`)
+      .join('');
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    tr.style.cssText = 'cursor:default';
+    tr.innerHTML = `
+      <td style="padding:.35rem .5rem"><input type="checkbox" class="row-chk" data-idx="${idx}"></td>
+      <td style="padding:.35rem .5rem"><code style="font-size:.72rem;background:#E3F2FD;color:#1565C0;padding:.15rem .4rem;border-radius:3px">${esc(item.APP_SHORT_NAME)}</code></td>
+      <td style="padding:.35rem .5rem;font-size:.78rem;font-weight:600;color:#1565C0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.OBJ_TYPE)}">${esc(item.OBJ_TYPE)}</td>
+      <td style="padding:.35rem .5rem;font-size:.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.OBJ_NAME)}">${esc(item.OBJ_NAME)}</td>
+      <td style="padding:.35rem .5rem;font-size:.77rem;color:#546E7A;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.OBJ_DESC)}">${esc(item.OBJ_DESC)}</td>
+      <td style="padding:.35rem .5rem">${adds || '<span style="color:#CFD8DC;font-size:.72rem">—</span>'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Guardamos items en el DOM para acceder después
+  tbody.dataset.items = JSON.stringify(items);
+
+  document.getElementById('results-loading').style.display   = 'none';
+  document.getElementById('results-error').style.display     = 'none';
+  document.getElementById('results-placeholder').style.display = 'none';
+  document.getElementById('results-container').style.display = 'block';
+
+  const cnt = document.getElementById('result-count');
+  cnt.textContent = items.length + (items.length === 50 ? ' (máx)' : '');
+  cnt.style.display = 'inline';
+
+  document.getElementById('btn-agregar-todos').style.display = 'inline-flex';
+  document.getElementById('btn-agregar-sel').style.display   = 'inline-flex';
+  document.getElementById('chk-all').checked = false;
+}
+
+// ── Selección ──────────────────────────────────────────────────
+function toggleAll(chk) {
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = chk.checked);
+}
+
+function agregarSeleccionados() {
+  const tbody = document.getElementById('results-tbody');
+  const allItems = JSON.parse(tbody.dataset.items || '[]');
+  const checked  = [...document.querySelectorAll('.row-chk:checked')].map(c => parseInt(c.dataset.idx));
+  if (!checked.length) { alert('Seleccioná al menos un objeto.'); return; }
+  checked.forEach(idx => addToSelection(allItems[idx]));
+  // Quitar filas de la tabla de resultados
+  checked.sort((a,b)=>b-a).forEach(idx => {
+    const row = document.querySelector(`.row-chk[data-idx="${idx}"]`)?.closest('tr');
+    if (row) row.remove();
+    allItems.splice(idx, 1);
+  });
+  tbody.dataset.items = JSON.stringify(allItems);
+  // Re-numerar índices
+  document.querySelectorAll('.row-chk').forEach((c,i) => c.dataset.idx = i);
+  updateResultCount(allItems.length);
+  document.getElementById('chk-all').checked = false;
+}
+
+function agregarTodos() {
+  const tbody = document.getElementById('results-tbody');
+  const allItems = JSON.parse(tbody.dataset.items || '[]');
+  if (!allItems.length) return;
+  allItems.forEach(item => addToSelection(item));
+  tbody.innerHTML = '';
+  tbody.dataset.items = '[]';
+  updateResultCount(0);
+}
+
+function addToSelection(item) {
+  const key = item.OBJ_CODE + '|' + item.OBJ_TYPE + '|' + (item.APP_SHORT_NAME || '');
+  if (selectedItems.some(s => (s.OBJ_CODE+'|'+s.OBJ_TYPE+'|'+(s.APP_SHORT_NAME||'')) === key)) return;
+  selectedItems.push(item);
+  renderSelTable();
+}
+
+function removeFromSel(idx) {
+  selectedItems.splice(idx, 1);
+  renderSelTable();
+}
+
+function limpiarSeleccion() {
+  if (selectedItems.length && !confirm('¿Limpiar todos los objetos seleccionados?')) return;
+  selectedItems = [];
+  renderSelTable();
+  document.getElementById('gen-panel').style.display = 'none';
+}
+
+function renderSelTable() {
+  const tbody  = document.getElementById('sel-tbody');
+  const ph     = document.getElementById('sel-placeholder');
+  const cnt    = document.getElementById('sel-count');
+  const cont   = document.getElementById('sel-container');
+  const btnG   = document.getElementById('btn-generar');
+  const btnLim = document.getElementById('btn-limpiar-sel');
+
+  tbody.innerHTML = '';
+
+  if (!selectedItems.length) {
+    ph.style.display   = 'block';
+    cont.style.display = 'none';
+    cnt.style.display  = 'none';
+    btnG.style.display = 'none';
+    btnLim.style.display = 'none';
+    return;
+  }
+
+  selectedItems.forEach((item, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span style="background:#E3F2FD;color:#1565C0;border-radius:4px;padding:.2rem .5rem;font-size:.72rem;font-weight:700">${esc(item.OBJ_CODE)}</span></td>
+      <td><code style="font-size:.75rem">${esc(item.APP_SHORT_NAME)}</code></td>
+      <td style="font-size:.8rem;font-weight:600;color:#263238;max-width:220px;word-break:break-all">${esc(item.OBJ_TYPE)}</td>
+      <td style="font-size:.8rem;max-width:200px">${esc(item.OBJ_NAME)}</td>
+      <td style="font-size:.78rem;color:#78909C;max-width:160px">${esc(item.OBJ_DESC)}</td>
+      <td><button onclick="removeFromSel(${idx})" style="background:none;border:none;color:#EF5350;cursor:pointer;font-size:1rem;line-height:1">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  ph.style.display   = 'none';
+  cont.style.display = 'block';
+  cnt.textContent    = selectedItems.length;
+  cnt.style.display  = 'inline';
+  btnG.style.display = 'inline-flex';
+  btnLim.style.display = 'inline-flex';
+}
+
+// ── Generar FNDLOAD ────────────────────────────────────────────
+async function generarSentencias() {
+  const ambienteId = document.getElementById('cred-ambiente').value;
+  const user       = document.getElementById('cred-user').value.trim();
+  const pass       = document.getElementById('cred-pass').value.trim();
+
+  if (!ambienteId || !user || !pass) {
+    alert('Completá las credenciales Oracle en la parte superior.');
+    return;
+  }
+  if (!selectedItems.length) {
+    alert('No hay objetos en la lista de generación.');
+    return;
+  }
+
+  const payload = {
+    ambiente_id: ambienteId,
+    db_user:     user,
+    db_pass:     pass,
+    items:       selectedItems,
+  };
+
+  const panel = document.getElementById('gen-panel');
+  const list  = document.getElementById('gen-list');
+  panel.style.display = 'block';
+  list.innerHTML = '<div style="color:#78909C;font-size:.85rem">Generando...</div>';
+
+  try {
+    const resp = await fetch('/download/generar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      list.innerHTML = `<div class="r2-alert danger">${data.error}</div>`;
+      return;
+    }
+    renderSentencias(data.sentencias || []);
+  } catch (e) {
+    list.innerHTML = `<div class="r2-alert danger">Error: ${e.message}</div>`;
+  }
+}
+
+function renderSentencias(sentencias) {
+  const list = document.getElementById('gen-list');
+  list.innerHTML = '';
+  sentencias.forEach((s, idx) => {
+    const div = document.createElement('div');
+    if (s.ok) {
+      div.innerHTML = `
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem">
+          <span style="background:#E8F5E9;color:#2E7D32;border-radius:4px;padding:.15rem .55rem;font-size:.72rem;font-weight:700">${esc(s.item.OBJ_CODE)}</span>
+          <span style="font-size:.82rem;font-weight:600;color:#263238">${esc(s.item.OBJ_TYPE)}</span>
+          <span style="font-size:.75rem;color:#90A4AE">— ${esc(s.item.APP_SHORT_NAME)}</span>
+        </div>
+        <div class="r2-code" style="margin:0">
+          <button class="copy-btn" onclick="copyCode(this, 'sent-${idx}')">Copiar</button>
+          <code id="sent-${idx}" style="display:block;padding-right:5rem;word-break:break-all;white-space:pre-wrap">${esc(s.sentencia)}</code>
+        </div>
+      `;
+    } else {
+      div.innerHTML = `
+        <div class="r2-alert danger" style="margin:0">
+          <strong>${esc(s.item?.OBJ_TYPE || '?')}</strong>: ${esc(s.error)}
+        </div>
+      `;
+    }
+    list.appendChild(div);
+  });
+  const genPanel = document.getElementById('gen-panel');
+  genPanel.style.display = 'block';
+  genPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyCode(btn, id) {
+  const text = document.getElementById(id)?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '¡Copiado!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function copiarTodas() {
+  const codes = [...document.querySelectorAll('[id^="sent-"]')].map(el => el.textContent).join('\n\n');
+  navigator.clipboard.writeText(codes).then(() => alert('Todas las sentencias copiadas al portapapeles.'));
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function esc(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showResultsLoading() {
+  document.getElementById('results-placeholder').style.display = 'none';
+  document.getElementById('results-container').style.display  = 'none';
+  document.getElementById('results-error').style.display      = 'none';
+  document.getElementById('results-loading').style.display    = 'block';
+  document.getElementById('result-count').style.display       = 'none';
+  document.getElementById('btn-agregar-todos').style.display  = 'none';
+  document.getElementById('btn-agregar-sel').style.display    = 'none';
+}
+
+function showResultsError(msg) {
+  document.getElementById('results-loading').style.display   = 'none';
+  document.getElementById('results-container').style.display = 'none';
+  document.getElementById('results-placeholder').style.display = 'none';
+  const el = document.getElementById('results-error');
+  el.textContent = msg;
+  el.style.display = 'flex';
+}
+
+function updateResultCount(n) {
+  const cnt = document.getElementById('result-count');
+  if (n === 0) {
+    document.getElementById('results-placeholder').textContent = 'No quedan resultados en la tabla.';
+    document.getElementById('results-placeholder').style.display = 'block';
+    document.getElementById('results-container').style.display = 'none';
+    cnt.style.display = 'none';
+    document.getElementById('btn-agregar-todos').style.display = 'none';
+    document.getElementById('btn-agregar-sel').style.display   = 'none';
+  } else {
+    cnt.textContent = n;
+  }
+}
+
+function limpiarBusqueda() {
+  ['f-app','f-obj','f-add1','f-add2','f-add3','f-add4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('results-tbody').innerHTML = '';
+  document.getElementById('results-tbody').dataset.items = '[]';
+  document.getElementById('results-container').style.display = 'none';
+  document.getElementById('results-placeholder').style.display = 'block';
+  document.getElementById('results-placeholder').textContent = 'Completá la búsqueda para ver los objetos EBS disponibles.';
+  document.getElementById('result-count').style.display = 'none';
+  document.getElementById('btn-agregar-todos').style.display = 'none';
+  document.getElementById('btn-agregar-sel').style.display   = 'none';
+}
+
+// Enter en campos de búsqueda dispara buscar
+['f-obj','f-add1','f-add2','f-add3','f-add4'].forEach(id => {
+  document.getElementById(id)?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') buscar();
+  });
+});
+</script>
+{% endblock %}

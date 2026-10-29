@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Tipos y Extensiones de Línea{% endblock %}
+{% block page_title %}Configuración › Tipos y extensiones de línea{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Tipos configurados</h2></div>
+    {% if tipos %}
+    <table class="r2-table">
+      <thead><tr><th>Código</th><th>Extensión</th><th>Descripción</th><th></th></tr></thead>
+      <tbody>
+        {% for t in tipos %}
+        <tr>
+          <td><strong>{{ t.codigo }}</strong></td>
+          <td><code>.{{ t.extension }}</code></td>
+          <td>{{ t.descripcion or '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('configuracion.tipo_linea_eliminar', id=t.id) }}"
+                  data-confirm="¿Desactivar tipo {{ t.codigo }}?">
+              <button class="btn-r2 btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="r2-alert info">Sin tipos configurados.</div>
+    {% endif %}
+  </div>
+
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Nuevo tipo</h2></div>
+    <form method="post" action="{{ url_for('configuracion.tipo_linea_nuevo') }}">
+      <div class="r2-form-group">
+        <label>Código *</label>
+        <input name="codigo" required placeholder="ej: MENU">
+      </div>
+      <div class="r2-form-group">
+        <label>Extensión *</label>
+        <input name="extension" required placeholder="ej: ldt">
+      </div>
+      <div class="r2-form-group">
+        <label>Descripción</label>
+        <input name="descripcion" placeholder="Descripción opcional">
+      </div>
+      <button type="submit" class="btn-r2 btn-primary">Crear</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

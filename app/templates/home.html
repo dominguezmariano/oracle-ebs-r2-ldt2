@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+
+{% block content %}
+<div class="r2-hero">
+  <h2>Bienvenido a R2-LDT2</h2>
+  <p>Generador de archivos LDT para Oracle EBS R12.1.3 — rápido, limpio y sin complicaciones.</p>
+</div>
+
+<div class="r2-stats">
+  <div class="r2-stat">
+    <span class="stat-value">{{ total_ambientes }}</span>
+    <span class="stat-label">Ambientes activos</span>
+  </div>
+  <div class="r2-stat accent">
+    <span class="stat-value">{{ total_usuarios }}</span>
+    <span class="stat-label">Usuarios configurados</span>
+  </div>
+  <div class="r2-stat success">
+    <span class="stat-value">11</span>
+    <span class="stat-label">Tipos de objeto LDT</span>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+  <div class="r2-card">
+    <div class="r2-card-header">
+      <svg viewBox="0 0 24 24" fill="#1565C0" width="20"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+      <h2>Acceso rápido</h2>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.6rem">
+      <a href="{{ url_for('download.index') }}" class="btn-r2 btn-primary" style="justify-content:center">
+        Ir a Download Manager
+      </a>
+      <a href="{{ url_for('configuracion.ambientes') }}" class="btn-r2 btn-outline" style="justify-content:center">
+        Gestionar Ambientes
+      </a>
+    </div>
+  </div>
+
+  <div class="r2-card">
+    <div class="r2-card-header">
+      <svg viewBox="0 0 24 24" fill="#1565C0" width="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+      <h2>¿Qué es R2-LDT2?</h2>
+    </div>
+    <p style="font-size:.875rem;color:#546E7A;line-height:1.6;margin:0">
+      Herramienta para generar las sentencias <strong>FNDLOAD</strong> necesarias para descargar
+      objetos de Oracle EBS como archivos <code>.ldt</code>. Configura tus ambientes, aplicaciones
+      y luego generá los comandos directamente desde el Download Manager.
+    </p>
+  </div>
+</div>
+
+<div class="r2-card">
+  <div class="r2-card-header">
+    <svg viewBox="0 0 24 24" fill="#1565C0" width="20"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    <h2>Tipos de objeto soportados</h2>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+    {% for tipo in ['MENU','FUNCTION','RESPONSIBILITY','LOOKUP','PROFILE','REQUEST_GROUP','CONCURRENT_PROGRAM','VALUE_SET','DFF','KFF','MESSAGE'] %}
+    <span style="background:#E3F2FD;color:#1565C0;border-radius:6px;padding:.25rem .7rem;font-size:.78rem;font-weight:600">{{ tipo }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

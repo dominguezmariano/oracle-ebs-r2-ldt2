@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Plantillas FNDLOAD{% endblock %}
+{% block page_title %}Configuración › Plantillas sentencias FNDLOAD{% endblock %}
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start">
+
+  <!-- LISTA DE PLANTILLAS -->
+  <div class="r2-card">
+    <div class="r2-card-header" style="justify-content:space-between">
+      <h2>Plantillas configuradas</h2>
+      <span style="font-size:.75rem;color:#90A4AE">Comodines: <code>%OBJECT_NAME%</code> <code>%APPL_SHORT_NAME%</code> <code>%OBJ_NAME%</code> <code>$dbUser/$dbPass</code></span>
+    </div>
+
+    {% if plantillas %}
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;border:1px solid #ECEFF1;border-radius:6px">
+    <table class="r2-table" style="margin:0;border:none;font-size:.8rem">
+      <thead style="position:sticky;top:0;z-index:2;background:#F5F7FA">
+        <tr>
+          <th style="border-top:none;width:36px">Hab.</th>
+          <th style="border-top:none;width:42px">Seq</th>
+          <th style="border-top:none;width:110px">Tipo</th>
+          <th style="border-top:none;width:80px">Ejec. Tipo</th>
+          <th style="border-top:none;width:90px">Ejecutable</th>
+          <th style="border-top:none">Parámetros</th>
+          <th style="border-top:none;width:70px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plantillas %}
+        <tr style="opacity:{{ '1' if p.habilitado else '0.45' }}">
+          <td style="text-align:center">
+            <button onclick="toggleHab({{ p.id }}, this)"
+                    style="background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1"
+                    title="{{ 'Deshabilitar' if p.habilitado else 'Habilitar' }}">
+              {{ '✅' if p.habilitado else '⬜' }}
+            </button>
+          </td>
+          <td style="text-align:center;font-weight:700;color:#546E7A">{{ p.secuencia }}</td>
+          <td>
+            <span style="background:#E3F2FD;color:#1565C0;border-radius:4px;padding:.15rem .5rem;font-size:.72rem;font-weight:700">{{ p.codigo_tipo }}</span>
+          </td>
+          <td style="color:#78909C;font-size:.75rem">{{ p.tipo_ejec }}</td>
+          <td><code style="font-size:.78rem;font-weight:600">{{ p.ejecutable }}</code></td>
+          <td style="font-size:.75rem;color:#455A64;max-width:320px">
+            {% set params = p.parametros() %}
+            {% for param in params %}
+            <div style="border-left:2px solid #E3F2FD;padding-left:.4rem;margin:.1rem 0;
+                        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:310px"
+                 title="{{ param }}">
+              <span style="color:#90A4AE;font-size:.68rem">{{ loop.index }}.</span> {{ param }}
+            </div>
+            {% else %}
+            <span style="color:#CFD8DC">sin parámetros</span>
+            {% endfor %}
+          </td>
+          <td style="white-space:nowrap">
+            <a href="{{ url_for('configuracion.plantilla_ldt_editar', id=p.id) }}"
+               class="btn-r2 btn-outline btn-sm" style="margin-right:.25rem">Editar</a>
+            <form method="post" action="{{ url_for('configuracion.plantilla_ldt_eliminar', id=p.id) }}"
+                  style="display:inline" data-confirm="¿Eliminar esta plantilla?">
+              <button class="btn-r2 btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="r2-alert info">Sin plantillas configuradas. Creá la primera desde el formulario.</div>
+    {% endif %}
+  </div>
+
+  <!-- FORMULARIO NUEVA PLANTILLA -->
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Nueva plantilla</h2></div>
+    <form method="post" action="{{ url_for('configuracion.plantilla_ldt_nueva') }}">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+        <div class="r2-form-group" style="margin:0">
+          <label>Secuencia *</label>
+          <input name="secuencia" type="number" value="10" min="1" max="999" required>
+        </div>
+        <div class="r2-form-group" style="margin:0">
+          <label>Tipo ejecución *</label>
+          <input name="tipo_ejec" value="DOWNLOAD" required placeholder="DOWNLOAD">
+        </div>
+      </div>
+
+      <div class="r2-form-group">
+        <label>Código tipo de línea *</label>
+        <select name="codigo_tipo" required>
+          <option value="">Seleccionar...</option>
+          {% for code, desc in tipos.items() %}
+          <option value="{{ code }}">{{ code }} — {{ desc }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="r2-form-group">
+        <label>Ejecutable *</label>
+        <input name="ejecutable" required placeholder="ej: FNDLOAD  o  export">
+      </div>
+
+      <div style="border-top:1px solid #ECEFF1;padding-top:.75rem;margin:.5rem 0 .25rem">
+        <div style="font-size:.72rem;font-weight:700;color:#90A4AE;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem">
+          Parámetros <span style="font-weight:400">(comodines: %OBJECT_NAME%, %APPL_SHORT_NAME%, %OBJ_NAME%, $dbUser/$dbPass)</span>
+        </div>
+        {% for i in range(1, 11) %}
+        <div class="r2-form-group" style="margin-bottom:.4rem">
+          <label style="font-size:.75rem;color:#78909C">Parámetro {{ i }}</label>
+          <input name="parametro_{{ i }}" placeholder="{{ 'ej: $dbUser/$dbPass' if i == 1 else ('ej: 0 Y DOWNLOAD' if i == 2 else '') }}" style="font-size:.82rem">
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="display:flex;align-items:center;gap:.5rem;margin:.5rem 0 1rem">
+        <input type="checkbox" name="habilitado" id="chk-hab-new" checked style="width:auto">
+        <label for="chk-hab-new" style="margin:0;cursor:pointer">Habilitada</label>
+      </div>
+
+      <button type="submit" class="btn-r2 btn-primary" style="width:100%;justify-content:center">
+        Crear plantilla
+      </button>
+    </form>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleHab(id, btn) {
+  const resp = await fetch(`/configuracion/plantillas-ldt/${id}/toggle`, { method: 'POST' });
+  const data = await resp.json();
+  btn.textContent = data.habilitado ? '✅' : '⬜';
+  btn.title = data.habilitado ? 'Deshabilitar' : 'Habilitar';
+  btn.closest('tr').style.opacity = data.habilitado ? '1' : '0.45';
+}
+</script>
+{% endblock %}

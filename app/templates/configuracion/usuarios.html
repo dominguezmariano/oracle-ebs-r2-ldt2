@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Usuarios Aplicación{% endblock %}
+{% block page_title %}Configuración › Usuarios Aplicación{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+  <!-- Lista -->
+  <div class="r2-card">
+    <div class="r2-card-header">
+      <h2>Usuarios configurados</h2>
+    </div>
+    {% if usuarios %}
+    <table class="r2-table">
+      <thead><tr><th>Usuario</th><th>Ambiente</th><th></th></tr></thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><strong>{{ u.username }}</strong><br><small style="color:#90A4AE">{{ u.nombre_completo or '' }}</small></td>
+          <td><span style="background:#E3F2FD;color:#1565C0;border-radius:4px;padding:.15rem .5rem;font-size:.78rem">{{ u.ambiente.nombre }}</span></td>
+          <td>
+            <form method="post" action="{{ url_for('configuracion.usuario_eliminar', id=u.id) }}"
+                  data-confirm="¿Eliminar usuario {{ u.username }}?">
+              <button class="btn-r2 btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="r2-alert info">No hay usuarios. Agregá uno.</div>
+    {% endif %}
+  </div>
+
+  <!-- Form -->
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Agregar usuario</h2></div>
+    <form method="post" action="{{ url_for('configuracion.usuario_nuevo') }}">
+      <div class="r2-form-group">
+        <label>Username Oracle EBS *</label>
+        <input name="username" required placeholder="ej: SYSADMIN">
+      </div>
+      <div class="r2-form-group">
+        <label>Nombre completo</label>
+        <input name="nombre_completo" placeholder="Nombre opcional">
+      </div>
+      <div class="r2-form-group">
+        <label>Ambiente *</label>
+        <select name="ambiente_id" required>
+          <option value="">Seleccionar...</option>
+          {% for a in ambientes %}
+          <option value="{{ a.id }}">{{ a.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-r2 btn-primary">Agregar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

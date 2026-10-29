@@ -1,0 +1,28 @@
+﻿version: "3.9"
+
+services:
+  r2-ldt2:
+    build: .
+    image: r2-ldt2:latest
+    container_name: r2-ldt2
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=sqlite:////data/r2ldt2.db
+    volumes:
+      - r2ldt2_data:/data
+    networks:
+      - r2-net
+
+volumes:
+  r2ldt2_data:
+
+networks:
+  r2-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.200.0/24

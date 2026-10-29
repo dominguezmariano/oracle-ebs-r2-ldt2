@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Parámetros LDT{% endblock %}
+{% block page_title %}Configuración › Parámetros sentencias LDT{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Parámetros activos</h2></div>
+    {% if parametros %}
+    <table class="r2-table">
+      <thead><tr><th>Nombre</th><th>Valor</th><th>Descripción</th><th></th></tr></thead>
+      <tbody>
+        {% for p in parametros %}
+        <tr>
+          <td><strong>{{ p.nombre }}</strong></td>
+          <td><code style="word-break:break-all">{{ p.valor }}</code></td>
+          <td>{{ p.descripcion or '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('configuracion.parametro_ldt_eliminar', id=p.id) }}"
+                  data-confirm="¿Desactivar parámetro {{ p.nombre }}?">
+              <button class="btn-r2 btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="r2-alert info">Sin parámetros configurados.</div>
+    {% endif %}
+  </div>
+
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Nuevo parámetro</h2></div>
+    <form method="post" action="{{ url_for('configuracion.parametro_ldt_nuevo') }}">
+      <div class="r2-form-group">
+        <label>Nombre *</label>
+        <input name="nombre" required placeholder="ej: APPS_LOGIN">
+      </div>
+      <div class="r2-form-group">
+        <label>Valor *</label>
+        <input name="valor" required placeholder="ej: APPS/APPS">
+      </div>
+      <div class="r2-form-group">
+        <label>Descripción</label>
+        <input name="descripcion" placeholder="Descripción opcional">
+      </div>
+      <button type="submit" class="btn-r2 btn-primary">Crear</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

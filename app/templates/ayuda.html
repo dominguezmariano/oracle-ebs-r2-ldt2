@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Ayuda{% endblock %}
+{% block page_title %}Ayuda{% endblock %}
+{% block content %}
+<div class="r2-card">
+  <div class="r2-card-header">
+    <h2>¿Cómo usar R2-LDT2?</h2>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:1.5rem">
+    <div>
+      <h3 style="color:#1565C0;font-size:.95rem;margin-bottom:.5rem">1. Configurar un ambiente</h3>
+      <p style="font-size:.875rem;color:#546E7A;line-height:1.6;margin:0">
+        Ir a <strong>Configuración → Ambientes</strong> y crear un ambiente con los datos de conexión
+        Oracle (host, puerto, service name). Podés tener tantos ambientes como necesites (DEV, QA, PRD).
+      </p>
+    </div>
+    <div>
+      <h3 style="color:#1565C0;font-size:.95rem;margin-bottom:.5rem">2. Registrar aplicaciones EBS</h3>
+      <p style="font-size:.875rem;color:#546E7A;line-height:1.6;margin:0">
+        En <strong>Configuración → Aplicaciones EBS</strong> registrá los short names de las aplicaciones
+        que vas a necesitar (FND, PER, GL, etc). Se usan al generar sentencias para objetos que requieren
+        APPLICATION_SHORT_NAME.
+      </p>
+    </div>
+    <div>
+      <h3 style="color:#1565C0;font-size:.95rem;margin-bottom:.5rem">3. Generar la sentencia FNDLOAD</h3>
+      <p style="font-size:.875rem;color:#546E7A;line-height:1.6;margin:0">
+        Ir a <strong>Download Manager</strong>, seleccionar el ambiente, ingresar usuario/contraseña de BD,
+        el tipo de objeto y su nombre. La herramienta genera el comando <code>FNDLOAD</code> listo para
+        ejecutar en el servidor EBS.
+      </p>
+    </div>
+    <div>
+      <h3 style="color:#1565C0;font-size:.95rem;margin-bottom:.5rem">4. Ejecutar el comando</h3>
+      <p style="font-size:.875rem;color:#546E7A;line-height:1.6;margin:0">
+        Copiá la sentencia generada y ejecutala en el servidor EBS con el usuario <code>applmgr</code>
+        (o quien tenga el entorno Oracle seteado). El archivo <code>.ldt</code> se generará en el directorio
+        desde donde corras el comando.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="r2-card">
+  <div class="r2-card-header"><h2>Estructura de sentencia FNDLOAD</h2></div>
+  <div class="r2-code">
+    <span style="display:block;white-space:pre">FNDLOAD &lt;user&gt;/&lt;pass&gt;@&lt;db&gt; 0 Y DOWNLOAD &lt;LCT_FILE&gt; &lt;output&gt;.ldt &lt;ENTITY&gt; &lt;KEY&gt;="&lt;VALUE&gt;"</span>
+  </div>
+  <div style="margin-top:1rem;font-size:.82rem;color:#546E7A;display:grid;grid-template-columns:auto 1fr;gap:.4rem .8rem">
+    <code>user/pass@db</code><span>Credenciales y conexión a la base Oracle EBS</span>
+    <code>0 Y DOWNLOAD</code><span>Parámetros estándar: log level, modo debug, acción</span>
+    <code>LCT_FILE</code><span>Archivo de configuración FNDLOAD (en $FND_TOP/patch/115/import/)</span>
+    <code>output.ldt</code><span>Archivo LDT que se genera</span>
+    <code>ENTITY</code><span>Entidad a descargar (ej: FND_MENU, FND_FORM_FUNCTION)</span>
+    <code>KEY="VALUE"</code><span>Filtro para identificar el objeto específico</span>
+  </div>
+</div>
+{% endblock %}

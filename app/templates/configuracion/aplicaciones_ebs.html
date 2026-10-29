@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Aplicaciones EBS{% endblock %}
+{% block page_title %}Configuración › Aplicaciones EBS{% endblock %}
+{% block content %}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;align-items:start">
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Aplicaciones registradas</h2></div>
+    {% if aplicaciones %}
+    <table class="r2-table">
+      <thead><tr><th>Short Name</th><th>Nombre</th><th>Descripción</th><th></th></tr></thead>
+      <tbody>
+        {% for a in aplicaciones %}
+        <tr>
+          <td><code>{{ a.short_name }}</code></td>
+          <td>{{ a.nombre }}</td>
+          <td>{{ a.descripcion or '—' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('configuracion.aplicacion_ebs_eliminar', id=a.id) }}"
+                  data-confirm="¿Desactivar aplicación {{ a.short_name }}?">
+              <button class="btn-r2 btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="r2-alert info">Sin aplicaciones registradas.</div>
+    {% endif %}
+  </div>
+
+  <div class="r2-card">
+    <div class="r2-card-header"><h2>Agregar aplicación</h2></div>
+    <form method="post" action="{{ url_for('configuracion.aplicacion_ebs_nueva') }}">
+      <div class="r2-form-group">
+        <label>Short Name *</label>
+        <input name="short_name" required placeholder="ej: FND">
+      </div>
+      <div class="r2-form-group">
+        <label>Nombre *</label>
+        <input name="nombre" required placeholder="ej: Application Object Library">
+      </div>
+      <div class="r2-form-group">
+        <label>Descripción</label>
+        <input name="descripcion" placeholder="Descripción opcional">
+      </div>
+      <button type="submit" class="btn-r2 btn-primary">Agregar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

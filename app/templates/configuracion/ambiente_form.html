@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if ambiente else 'Nuevo' }} Ambiente{% endblock %}
+{% block page_title %}Configuración › Ambientes › {{ 'Editar' if ambiente else 'Nuevo' }}{% endblock %}
+{% block content %}
+<div class="r2-card" style="max-width:600px">
+  <div class="r2-card-header">
+    <h2>{{ 'Editar ambiente' if ambiente else 'Nuevo ambiente' }}</h2>
+  </div>
+  <form method="post">
+    <div class="r2-form-group">
+      <label>Nombre *</label>
+      <input name="nombre" required value="{{ ambiente.nombre if ambiente else '' }}" placeholder="ej: PRODUCCION">
+    </div>
+    <div class="r2-form-group">
+      <label>Descripción</label>
+      <input name="descripcion" value="{{ ambiente.descripcion if ambiente else '' }}" placeholder="Descripción opcional">
+    </div>
+    <div class="r2-form-group">
+      <label>Host / IP *</label>
+      <input name="host" required value="{{ ambiente.host if ambiente else '' }}" placeholder="ej: 10.0.0.1 o db.empresa.com">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:1rem">
+      <div class="r2-form-group">
+        <label>Puerto *</label>
+        <input name="puerto" type="number" required value="{{ ambiente.puerto if ambiente else 1521 }}">
+      </div>
+      <div class="r2-form-group">
+        <label>Service Name *</label>
+        <input name="service_name" required value="{{ ambiente.service_name if ambiente else '' }}" placeholder="ej: EBSPRD">
+      </div>
+    </div>
+    <div style="display:flex;gap:.8rem;margin-top:1rem">
+      <button type="submit" class="btn-r2 btn-primary">Guardar</button>
+      <a href="{{ url_for('configuracion.ambientes') }}" class="btn-r2 btn-outline">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
