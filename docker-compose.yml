@@ -1,6 +1,4 @@
-﻿version: "3.9"
-
-services:
+﻿services:
   r2-ldt2:
     build: .
     image: r2-ldt2:latest
@@ -13,12 +11,9 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - DATABASE_URL=sqlite:////data/r2ldt2.db
     volumes:
-      - r2ldt2_data:/data
+      - ./data:/data
     networks:
       - r2-net
-
-volumes:
-  r2ldt2_data:
 
 networks:
   r2-net:
