@@ -7,17 +7,43 @@
     <div class="r2-card-header"><h2>Tipos configurados</h2></div>
     {% if tipos %}
     <table class="r2-table">
-      <thead><tr><th>Código</th><th>Extensión</th><th>Descripción</th><th></th></tr></thead>
+      <thead>
+        <tr><th>Código</th><th>Extensión</th><th>LCT</th><th>Descripción</th><th></th></tr>
+      </thead>
       <tbody>
         {% for t in tipos %}
-        <tr>
+        {# — fila de visualización — #}
+        <tr id="view-{{ t.id }}">
           <td><strong>{{ t.codigo }}</strong></td>
-          <td><code>.{{ t.extension }}</code></td>
+          <td><code>{{ t.extension }}</code></td>
+          <td><code>{{ t.lct_filename or '—' }}</code></td>
           <td>{{ t.descripcion or '—' }}</td>
-          <td>
-            <form method="post" action="{{ url_for('configuracion.tipo_linea_eliminar', id=t.id) }}"
+          <td style="white-space:nowrap">
+            <button class="btn-r2 btn-sm" onclick="showEdit({{ t.id }})" title="Editar">✎</button>
+            <form style="display:inline" method="post"
+                  action="{{ url_for('configuracion.tipo_linea_eliminar', id=t.id) }}"
                   data-confirm="¿Desactivar tipo {{ t.codigo }}?">
-              <button class="btn-r2 btn-danger btn-sm">×</button>
+              <button class="btn-r2 btn-danger btn-sm" title="Desactivar">×</button>
+            </form>
+          </td>
+        </tr>
+        {# — fila de edición (oculta por defecto) — #}
+        <tr id="edit-{{ t.id }}" style="display:none;background:var(--r2-card-bg,#1a1a2e)">
+          <td><strong>{{ t.codigo }}</strong></td>
+          <td colspan="4">
+            <form method="post" action="{{ url_for('configuracion.tipo_linea_editar', id=t.id) }}"
+                  style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.25rem 0">
+              <label style="font-size:.8rem;margin:0">Extensión</label>
+              <input name="extension" value="{{ t.extension }}" placeholder=".cnc"
+                     style="width:80px" required>
+              <label style="font-size:.8rem;margin:0">LCT</label>
+              <input name="lct_filename" value="{{ t.lct_filename or '' }}" placeholder="afcpprog.lct"
+                     style="width:140px">
+              <label style="font-size:.8rem;margin:0">Descripción</label>
+              <input name="descripcion" value="{{ t.descripcion or '' }}" placeholder="Descripción"
+                     style="width:180px">
+              <button type="submit" class="btn-r2 btn-primary btn-sm">Guardar</button>
+              <button type="button" class="btn-r2 btn-sm" onclick="hideEdit({{ t.id }})">Cancelar</button>
             </form>
           </td>
         </tr>
@@ -34,11 +60,15 @@
     <form method="post" action="{{ url_for('configuracion.tipo_linea_nuevo') }}">
       <div class="r2-form-group">
         <label>Código *</label>
-        <input name="codigo" required placeholder="ej: MENU">
+        <input name="codigo" required placeholder="ej: CONCPROG">
       </div>
       <div class="r2-form-group">
         <label>Extensión *</label>
-        <input name="extension" required placeholder="ej: ldt">
+        <input name="extension" required placeholder="ej: .cnc">
+      </div>
+      <div class="r2-form-group">
+        <label>Archivo LCT</label>
+        <input name="lct_filename" placeholder="ej: afcpprog.lct">
       </div>
       <div class="r2-form-group">
         <label>Descripción</label>
@@ -48,4 +78,16 @@
     </form>
   </div>
 </div>
+
+<script>
+function showEdit(id) {
+  document.getElementById('view-' + id).style.display = 'none';
+  document.getElementById('edit-' + id).style.display = '';
+  document.getElementById('edit-' + id).querySelector('input').focus();
+}
+function hideEdit(id) {
+  document.getElementById('edit-' + id).style.display = 'none';
+  document.getElementById('view-' + id).style.display = '';
+}
+</script>
 {% endblock %}

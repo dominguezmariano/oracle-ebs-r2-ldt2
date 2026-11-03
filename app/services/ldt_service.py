@@ -35,12 +35,13 @@ ADDITIONAL_HINTS = {
 }
 
 # Comodines disponibles en plantillas:
-#   %OBJECT_NAME%     → item['OBJ_TYPE']  (clave usada en FNDLOAD)
-#   %OBJ_NAME%        → item['OBJ_NAME']  (nombre legible)
-#   %APPL_SHORT_NAME% → item['APP_SHORT_NAME']
+#   %OBJECT_NAME%     → item['OBJ_TYPE']       (clave usada en FNDLOAD)
+#   %OBJ_NAME%        → item['OBJ_NAME']        (nombre legible)
+#   %APPL_SHORT_NAME% → item['APP_SHORT_NAME']  (alias de %VIEW_APPSNAME%)
+#   %VIEW_APPSNAME%   → item['APP_SHORT_NAME']  (nombre canónico LCT para LOOKUPS)
 #   %OBJ_DESC%        → item['OBJ_DESC']
 #   %ADDITIONAL_1..4% → item['ADDITIONAL_1'..'4']
-#   $dbUser/$dbPass   → user/pass@host:port/service  (forma corta)
+#   $dbUser/$dbPass   → literal (se reemplaza en segunda etapa)
 #   %DB_USER%         → usuario DB
 #   %DB_PASS%         → contraseña DB
 #   %DB_DSN%          → host:port/service
@@ -51,13 +52,15 @@ def _reemplazar(texto: str, item: dict, ambiente: Ambiente,
     if not texto:
         return ""
     dsn = f"{ambiente.host}:{ambiente.puerto}/{ambiente.service_name}"
+    app_short = item.get("APP_SHORT_NAME") or ""
     replacements = {
         "%DB_USER%":         db_user,
         "%DB_PASS%":         db_pass,
         "%DB_DSN%":          dsn,
         "%OBJECT_NAME%":     item.get("OBJ_TYPE") or "",
         "%OBJ_NAME%":        item.get("OBJ_NAME") or "",
-        "%APPL_SHORT_NAME%": item.get("APP_SHORT_NAME") or "",
+        "%APPL_SHORT_NAME%": app_short,
+        "%VIEW_APPSNAME%":   app_short,
         "%OBJ_DESC%":        item.get("OBJ_DESC") or "",
         "%ADDITIONAL_1%":    item.get("ADDITIONAL_1") or "",
         "%ADDITIONAL_2%":    item.get("ADDITIONAL_2") or "",

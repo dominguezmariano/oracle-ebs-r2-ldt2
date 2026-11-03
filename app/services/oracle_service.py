@@ -74,6 +74,10 @@ class OracleService:
         finally:
             conn.close()
 
+    def connect(self):
+        """Return an open oracledb connection. Caller is responsible for closing it."""
+        return self._connect()
+
     def get_fnd_apps(self) -> dict:
         """Llama a xx_apx_olt_utils_pk.getFndApps."""
         conn = self._connect()

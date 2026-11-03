@@ -118,13 +118,25 @@ def tipos_linea():
 @config_bp.route("/tipos-linea/nuevo", methods=["POST"])
 def tipo_linea_nuevo():
     t = TipoLinea(
-        codigo=request.form["codigo"],
+        codigo=request.form["codigo"].strip().upper(),
         descripcion=request.form.get("descripcion"),
-        extension=request.form["extension"],
+        extension=request.form["extension"].strip(),
+        lct_filename=request.form.get("lct_filename", "").strip() or None,
     )
     db.session.add(t)
     db.session.commit()
     flash(f'Tipo "{t.codigo}" creado.', "success")
+    return redirect(url_for("configuracion.tipos_linea"))
+
+
+@config_bp.route("/tipos-linea/<int:id>/editar", methods=["POST"])
+def tipo_linea_editar(id):
+    t = TipoLinea.query.get_or_404(id)
+    t.extension    = request.form.get("extension", t.extension).strip()
+    t.descripcion  = request.form.get("descripcion", t.descripcion)
+    t.lct_filename = request.form.get("lct_filename", "").strip() or None
+    db.session.commit()
+    flash(f'Tipo "{t.codigo}" actualizado.', "success")
     return redirect(url_for("configuracion.tipos_linea"))
 
 

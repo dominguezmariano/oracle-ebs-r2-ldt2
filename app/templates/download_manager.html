@@ -172,6 +172,10 @@
             <svg viewBox="0 0 24 24" fill="white" width="16"><path d="M8 5v14l11-7z"/></svg>
             Generar FNDLOAD
           </button>
+          <button class="btn-r2" onclick="generarLdt()" id="btn-generar-ldt" style="display:none;background:#1B5E20;color:#fff">
+            <svg viewBox="0 0 24 24" fill="white" width="16"><path d="M19 9h-4V3H9v6H5l7 7 7-7zm-8 2V5h2v6h1.17L12 13.17 9.83 11H11zm-6 7h14v2H5z"/></svg>
+            Descargar LDT
+          </button>
         </div>
       </div>
 
@@ -405,16 +409,18 @@ function renderSelTable() {
   const ph     = document.getElementById('sel-placeholder');
   const cnt    = document.getElementById('sel-count');
   const cont   = document.getElementById('sel-container');
-  const btnG   = document.getElementById('btn-generar');
-  const btnLim = document.getElementById('btn-limpiar-sel');
+  const btnG      = document.getElementById('btn-generar');
+  const btnGLdt   = document.getElementById('btn-generar-ldt');
+  const btnLim    = document.getElementById('btn-limpiar-sel');
 
   tbody.innerHTML = '';
 
   if (!selectedItems.length) {
-    ph.style.display   = 'block';
-    cont.style.display = 'none';
-    cnt.style.display  = 'none';
-    btnG.style.display = 'none';
+    ph.style.display     = 'block';
+    cont.style.display   = 'none';
+    cnt.style.display    = 'none';
+    btnG.style.display   = 'none';
+    btnGLdt.style.display = 'none';
     btnLim.style.display = 'none';
     return;
   }
@@ -436,8 +442,9 @@ function renderSelTable() {
   cont.style.display = 'block';
   cnt.textContent    = selectedItems.length;
   cnt.style.display  = 'inline';
-  btnG.style.display = 'inline-flex';
-  btnLim.style.display = 'inline-flex';
+  btnG.style.display    = 'inline-flex';
+  btnGLdt.style.display = 'inline-flex';
+  btnLim.style.display  = 'inline-flex';
 }
 
 // ── Generar FNDLOAD ────────────────────────────────────────────
@@ -513,6 +520,62 @@ function renderSentencias(sentencias) {
   const genPanel = document.getElementById('gen-panel');
   genPanel.style.display = 'block';
   genPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Descargar LDT ──────────────────────────────────────────────
+async function generarLdt() {
+  const ambienteId = document.getElementById('cred-ambiente').value;
+  const user       = document.getElementById('cred-user').value.trim();
+  const pass       = document.getElementById('cred-pass').value.trim();
+
+  if (!ambienteId || !user || !pass) {
+    alert('Completá las credenciales Oracle en la parte superior.');
+    return;
+  }
+  if (!selectedItems.length) {
+    alert('No hay objetos en la lista de generación.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-generar-ldt');
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Generando LDT...';
+
+  const payload = {
+    ambiente_id: ambienteId,
+    db_user:     user,
+    db_pass:     pass,
+    items:       selectedItems,
+  };
+
+  try {
+    const resp = await fetch('/download/generar_ldt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      alert(`Error: ${err.error || resp.statusText}`);
+      return;
+    }
+
+    // Trigger browser download
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'ldt_generados.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origText;
+  }
 }
 
 function copyCode(btn, id) {

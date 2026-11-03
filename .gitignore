@@ -7,3 +7,6 @@ data/*.db
 .venv/
 venv/
 instance/
+ejemplos/
+lct/
+notas.txt

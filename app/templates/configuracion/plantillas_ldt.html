@@ -7,14 +7,23 @@
 
   <!-- LISTA DE PLANTILLAS -->
   <div class="r2-card">
-    <div class="r2-card-header" style="justify-content:space-between">
+    <div class="r2-card-header" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem">
       <h2>Plantillas configuradas</h2>
-      <span style="font-size:.75rem;color:#90A4AE">Comodines: <code>%OBJECT_NAME%</code> <code>%APPL_SHORT_NAME%</code> <code>%OBJ_NAME%</code> <code>$dbUser/$dbPass</code></span>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+        <select id="filtro-tipo" onchange="filtrarTipo(this.value)"
+                style="font-size:.78rem;padding:.25rem .5rem;border:1px solid #B0BEC5;border-radius:4px;background:var(--r2-card-bg,#fff)">
+          <option value="">— todos los tipos —</option>
+          {% for code, desc in tipos.items() %}
+          <option value="{{ code }}">{{ code }}</option>
+          {% endfor %}
+        </select>
+        <span style="font-size:.75rem;color:#90A4AE">Comodines: <code>%OBJECT_NAME%</code> <code>%APPL_SHORT_NAME%</code> <code>%LANG%</code> <code>$dbUser/$dbPass</code></span>
+      </div>
     </div>
 
     {% if plantillas %}
     <div style="overflow-x:auto;max-height:600px;overflow-y:auto;border:1px solid #ECEFF1;border-radius:6px">
-    <table class="r2-table" style="margin:0;border:none;font-size:.8rem">
+    <table class="r2-table" id="tabla-plantillas" style="margin:0;border:none;font-size:.8rem">
       <thead style="position:sticky;top:0;z-index:2;background:#F5F7FA">
         <tr>
           <th style="border-top:none;width:36px">Hab.</th>
@@ -28,7 +37,7 @@
       </thead>
       <tbody>
         {% for p in plantillas %}
-        <tr style="opacity:{{ '1' if p.habilitado else '0.45' }}">
+        <tr data-tipo="{{ p.codigo_tipo }}" style="opacity:{{ '1' if p.habilitado else '0.45' }}">
           <td style="text-align:center">
             <button onclick="toggleHab({{ p.id }}, this)"
                     style="background:none;border:none;cursor:pointer;font-size:1.1rem;line-height:1"
@@ -45,10 +54,11 @@
           <td style="font-size:.75rem;color:#455A64;max-width:320px">
             {% set params = p.parametros() %}
             {% for param in params %}
-            <div style="border-left:2px solid #E3F2FD;padding-left:.4rem;margin:.1rem 0;
+            <div style="border-left:2px solid {% if loop.index == 4 %}#B3E5FC{% else %}#E3F2FD{% endif %};
+                        padding-left:.4rem;margin:.1rem 0;
                         overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:310px"
                  title="{{ param }}">
-              <span style="color:#90A4AE;font-size:.68rem">{{ loop.index }}.</span> {{ param }}
+              <span style="color:{% if loop.index == 4 %}#0277BD{% else %}#90A4AE{% endif %};font-size:.68rem;font-weight:{% if loop.index == 4 %}700{% else %}400{% endif %}">{{ loop.index }}.</span> {{ param }}
             </div>
             {% else %}
             <span style="color:#CFD8DC">sin parámetros</span>
@@ -105,12 +115,14 @@
 
       <div style="border-top:1px solid #ECEFF1;padding-top:.75rem;margin:.5rem 0 .25rem">
         <div style="font-size:.72rem;font-weight:700;color:#90A4AE;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.5rem">
-          Parámetros <span style="font-weight:400">(comodines: %OBJECT_NAME%, %APPL_SHORT_NAME%, %OBJ_NAME%, $dbUser/$dbPass)</span>
+          Parámetros <span style="font-weight:400">(comodines: %OBJECT_NAME%, %APPL_SHORT_NAME%, %LANG%, $dbUser/$dbPass)</span>
         </div>
         {% for i in range(1, 11) %}
         <div class="r2-form-group" style="margin-bottom:.4rem">
           <label style="font-size:.75rem;color:#78909C">Parámetro {{ i }}</label>
-          <input name="parametro_{{ i }}" placeholder="{{ 'ej: $dbUser/$dbPass' if i == 1 else ('ej: 0 Y DOWNLOAD' if i == 2 else '') }}" style="font-size:.82rem">
+          <input name="parametro_{{ i }}"
+                 placeholder="{{ 'ej: $dbUser/$dbPass' if i == 1 else ('ej: 0 Y' if i == 2 else ('ej: $FND_TOP/patch/115/import/archivo.lct' if i == 3 else ('%OBJECT_NAME%_CP_%LANG%.cnc  (nombre archivo salida)' if i == 4 else ''))) }}"
+                 style="font-size:.82rem{% if i == 4 %};border-color:#B3E5FC{% endif %}">
         </div>
         {% endfor %}
       </div>
@@ -137,6 +149,12 @@ async function toggleHab(id, btn) {
   btn.textContent = data.habilitado ? '✅' : '⬜';
   btn.title = data.habilitado ? 'Deshabilitar' : 'Habilitar';
   btn.closest('tr').style.opacity = data.habilitado ? '1' : '0.45';
+}
+
+function filtrarTipo(tipo) {
+  document.querySelectorAll('#tabla-plantillas tbody tr').forEach(tr => {
+    tr.style.display = (!tipo || tr.dataset.tipo === tipo) ? '' : 'none';
+  });
 }
 </script>
 {% endblock %}

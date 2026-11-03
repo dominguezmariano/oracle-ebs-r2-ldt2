@@ -9,6 +9,7 @@ class TipoLinea(db.Model):
     codigo = db.Column(db.String(50), nullable=False, unique=True)
     descripcion = db.Column(db.String(200))
     extension = db.Column(db.String(20), nullable=False)
+    lct_filename = db.Column(db.String(100))  # e.g. 'aflvmlu.lct', 'afcpprog.lct'
     activo = db.Column(db.Boolean, default=True)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
