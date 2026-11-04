@@ -6,6 +6,7 @@ from app.models.ambiente import Ambiente
 from app.models.aplicacion_ebs import AplicacionEbs
 from app.models.plantilla_ldt import PlantillaLdt
 from app.models.tipo_linea import TipoLinea
+from app.services import credenciales
 from app.services.oracle_service import OracleService
 from app.services.ldt_service import LdtService
 from app.services.ldt_generator import LdtGenerator
@@ -101,6 +102,20 @@ def _render_filename(template: str, obj_type: str, app_short: str, lang: str) ->
     return re.sub(r'[^A-Za-z0-9_\-.]', '_', result)
 
 
+def _credenciales(ambiente, data):
+    """(user, pass, desde_servidor) — override manual del cliente o secrets del servidor."""
+    return credenciales.resolver(
+        ambiente,
+        (data.get("db_user") or "").strip(),
+        (data.get("db_pass") or "").strip(),
+    )
+
+
+_ERR_CREDS = ("El ambiente no tiene credenciales configuradas. Definí el usuario en "
+              "Configuración › Ambientes y la password en los secrets del servidor, "
+              "o ingresalas manualmente.")
+
+
 @download_bp.route("/")
 def index():
     ambientes = Ambiente.query.filter_by(activo=True).order_by(Ambiente.nombre).all()
@@ -119,8 +134,6 @@ def buscar():
     """Llama a getFndObjects en Oracle y devuelve los items encontrados."""
     data = request.get_json() or request.form
     ambiente_id  = data.get("ambiente_id")
-    db_user      = (data.get("db_user") or "").strip()
-    db_pass      = (data.get("db_pass") or "").strip()
     type_code    = (data.get("type_code") or "").strip()
     app_short    = (data.get("app_short_name") or "").strip() or None
     obj_type     = (data.get("obj_type") or "").strip() or None
@@ -129,12 +142,16 @@ def buscar():
     additional_3 = (data.get("additional_3") or "").strip() or None
     additional_4 = (data.get("additional_4") or "").strip() or None
 
-    if not all([ambiente_id, db_user, db_pass, type_code]):
-        return jsonify({"error": "Faltan campos obligatorios: ambiente, usuario, contraseña y tipo"}), 400
+    if not all([ambiente_id, type_code]):
+        return jsonify({"error": "Faltan campos obligatorios: ambiente y tipo"}), 400
 
     ambiente = Ambiente.query.get(ambiente_id)
     if not ambiente:
         return jsonify({"error": "Ambiente no encontrado"}), 404
+
+    db_user, db_pass, _ = _credenciales(ambiente, data)
+    if not db_user:
+        return jsonify({"error": _ERR_CREDS}), 400
 
     tipos = LdtService.tipos_disponibles()
     type_desc = tipos.get(type_code, type_code)
@@ -171,18 +188,23 @@ def generar():
         return jsonify({"error": "Payload JSON requerido"}), 400
 
     ambiente_id = data.get("ambiente_id")
-    db_user     = (data.get("db_user") or "").strip()
-    db_pass     = (data.get("db_pass") or "").strip()
     items       = data.get("items", [])
 
-    if not all([ambiente_id, db_user, db_pass]):
-        return jsonify({"error": "Faltan credenciales o ambiente"}), 400
+    if not ambiente_id:
+        return jsonify({"error": "Falta el ambiente"}), 400
     if not items:
         return jsonify({"error": "No hay objetos seleccionados"}), 400
 
     ambiente = Ambiente.query.get(ambiente_id)
     if not ambiente:
         return jsonify({"error": "Ambiente no encontrado"}), 404
+
+    db_user, db_pass, desde_servidor = _credenciales(ambiente, data)
+    if not db_user:
+        return jsonify({"error": _ERR_CREDS}), 400
+    if desde_servidor:
+        # Estas sentencias viajan al navegador: la password del servidor nunca se incluye.
+        db_pass = "$dbPass"
 
     sentencias = []
     for item in items:
@@ -208,18 +230,20 @@ def generar_ldt():
         return jsonify({"error": "Payload JSON requerido"}), 400
 
     ambiente_id = data.get("ambiente_id")
-    db_user     = (data.get("db_user") or "").strip()
-    db_pass     = (data.get("db_pass") or "").strip()
     items       = data.get("items", [])
 
-    if not all([ambiente_id, db_user, db_pass]):
-        return jsonify({"error": "Faltan credenciales o ambiente"}), 400
+    if not ambiente_id:
+        return jsonify({"error": "Falta el ambiente"}), 400
     if not items:
         return jsonify({"error": "No hay objetos seleccionados"}), 400
 
     ambiente = Ambiente.query.get(ambiente_id)
     if not ambiente:
         return jsonify({"error": "Ambiente no encontrado"}), 404
+
+    db_user, db_pass, _ = _credenciales(ambiente, data)
+    if not db_user:
+        return jsonify({"error": _ERR_CREDS}), 400
 
     svc = OracleService(ambiente, db_user, db_pass)
     gen = LdtGenerator()

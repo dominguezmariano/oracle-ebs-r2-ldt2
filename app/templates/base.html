@@ -90,7 +90,15 @@
 <!-- ═══ TOPBAR ═══ -->
 <header class="r2-topbar">
   <span class="page-title">{% block page_title %}R2-LDT2{% endblock %}</span>
-  <span class="r2-badge">Oracle EBS R12.1.3</span>
+  <span style="display:flex;align-items:center;gap:12px">
+    {% if current_user %}
+      <small title="{{ 'SSO ATP3' if auth_enabled else 'Auth desactivada (modo local)' }}">
+        {{ current_user }}{% if not auth_enabled %} (local){% endif %}
+        {% if auth_enabled %} · <a href="{{ url_for('auth.logout') }}">Salir</a>{% endif %}
+      </small>
+    {% endif %}
+    <span class="r2-badge">Oracle EBS R12.1.3</span>
+  </span>
 </header>
 
 <!-- ═══ MAIN ═══ -->

@@ -14,7 +14,7 @@
   {% if ambientes %}
   <table class="r2-table">
     <thead>
-      <tr><th>Nombre</th><th>Host</th><th>Puerto</th><th>Service Name</th><th>Estado</th><th>Acciones</th></tr>
+      <tr><th>Nombre</th><th>Host</th><th>Puerto</th><th>Service Name</th><th>Credenciales</th><th>Estado</th><th>Acciones</th></tr>
     </thead>
     <tbody>
       {% for a in ambientes %}
@@ -23,6 +23,13 @@
         <td>{{ a.host }}</td>
         <td>{{ a.puerto }}</td>
         <td><code>{{ a.service_name }}</code></td>
+        <td>
+          {% if a.tiene_credenciales %}
+            <span class="badge-active" title="{{ a.password_var }}">{{ a.db_user }} · secret OK</span>
+          {% else %}
+            <span class="badge-inactive" title="Se espera {{ a.password_var }}">{{ 'Falta secret' if a.db_user else 'Manual' }}</span>
+          {% endif %}
+        </td>
         <td><span class="{{ 'badge-active' if a.activo else 'badge-inactive' }}">{{ 'Activo' if a.activo else 'Inactivo' }}</span></td>
         <td style="display:flex;gap:.4rem;flex-wrap:wrap">
           <a href="{{ url_for('configuracion.ambiente_editar', id=a.id) }}" class="btn-r2 btn-outline btn-sm">Editar</a>

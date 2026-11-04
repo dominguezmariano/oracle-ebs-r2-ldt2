@@ -10,3 +10,5 @@ instance/
 ejemplos/
 lct/
 notas.txt
+secrets.env
+secrets/

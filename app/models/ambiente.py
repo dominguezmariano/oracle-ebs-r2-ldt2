@@ -11,11 +11,22 @@ class Ambiente(db.Model):
     host = db.Column(db.String(200), nullable=False)
     puerto = db.Column(db.Integer, default=1521)
     service_name = db.Column(db.String(100), nullable=False)
+    db_user = db.Column(db.String(100))  # La password NO se guarda: ver services/credenciales.py
     activo = db.Column(db.Boolean, default=True)
     creado_en = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f"<Ambiente {self.nombre}>"
+
+    @property
+    def password_var(self) -> str:
+        from app.services.credenciales import nombre_variable
+        return nombre_variable(self.nombre)
+
+    @property
+    def tiene_credenciales(self) -> bool:
+        from app.services.credenciales import tiene_credenciales
+        return tiene_credenciales(self)
 
     def to_dict(self):
         return {

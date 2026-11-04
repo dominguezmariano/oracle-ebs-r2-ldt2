@@ -16,7 +16,8 @@
       <select id="cred-ambiente">
         <option value="">Seleccionar ambiente...</option>
         {% for a in ambientes %}
-        <option value="{{ a.id }}" data-label="{{ a.nombre }} — {{ a.service_name }}">{{ a.nombre }} — {{ a.host }}:{{ a.puerto }}/{{ a.service_name }}</option>
+        <option value="{{ a.id }}" data-label="{{ a.nombre }} — {{ a.service_name }}"
+                data-user="{{ a.db_user or '' }}" data-managed="{{ '1' if a.tiene_credenciales else '' }}">{{ a.nombre }} — {{ a.host }}:{{ a.puerto }}/{{ a.service_name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -228,6 +229,29 @@
 // ── Estado global ──────────────────────────────────────────────
 let selectedItems = [];  // objetos en la grilla de selección
 
+// ── Credenciales gestionadas por el servidor ───────────────────
+// Si el ambiente tiene usuario + secret configurados, el usuario se muestra
+// bloqueado y la contraseña no se pide ni se envía (la resuelve el servidor).
+function isManaged() {
+  const opt = document.getElementById('cred-ambiente').selectedOptions[0];
+  return !!(opt && opt.dataset.managed);
+}
+function onAmbienteChange() {
+  const opt  = document.getElementById('cred-ambiente').selectedOptions[0];
+  const user = document.getElementById('cred-user');
+  const pass = document.getElementById('cred-pass');
+  if (isManaged()) {
+    user.value = opt.dataset.user; user.readOnly = true;
+    pass.value = ''; pass.disabled = true;
+    pass.placeholder = 'Configurada en el servidor';
+  } else {
+    user.readOnly = false; pass.disabled = false;
+    pass.placeholder = '••••••';
+    if (opt && opt.dataset.user && !user.value) user.value = opt.dataset.user;
+  }
+}
+document.getElementById('cred-ambiente').addEventListener('change', onAmbienteChange);
+
 // ── Hints de campos adicionales por tipo ───────────────────────
 const ADDITIONAL_HINTS = {{ {
   'FORMPERS':          ['Secuencia', 'Nombre del Form', '', ''],
@@ -261,7 +285,7 @@ async function buscar() {
   const pass       = document.getElementById('cred-pass').value.trim();
   const typeCode   = document.getElementById('f-tipo').value;
 
-  if (!ambienteId || !user || !pass || !typeCode) {
+  if (!ambienteId || (!isManaged() && (!user || !pass)) || !typeCode) {
     showResultsError('Completá: ambiente, usuario, contraseña y tipo de objeto.');
     return;
   }
@@ -453,7 +477,7 @@ async function generarSentencias() {
   const user       = document.getElementById('cred-user').value.trim();
   const pass       = document.getElementById('cred-pass').value.trim();
 
-  if (!ambienteId || !user || !pass) {
+  if (!ambienteId || (!isManaged() && (!user || !pass))) {
     alert('Completá las credenciales Oracle en la parte superior.');
     return;
   }
@@ -528,7 +552,7 @@ async function generarLdt() {
   const user       = document.getElementById('cred-user').value.trim();
   const pass       = document.getElementById('cred-pass').value.trim();
 
-  if (!ambienteId || !user || !pass) {
+  if (!ambienteId || (!isManaged() && (!user || !pass))) {
     alert('Completá las credenciales Oracle en la parte superior.');
     return;
   }

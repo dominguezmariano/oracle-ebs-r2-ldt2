@@ -6,10 +6,20 @@
     restart: unless-stopped
     ports:
       - "5000:5000"
+    # Passwords de DB por ambiente (EBS_DB_PASSWORD_<AMBIENTE>). Opcional: si no existe, se piden a mano.
+    env_file:
+      - path: ./secrets.env
+        required: false
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - DATABASE_URL=sqlite:////data/r2ldt2.db
+      # Auth SSO ATP3. Default: desactivada (todo corre como AUTH_DEV_USER)
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - AUTH_DEV_USER=${AUTH_DEV_USER:-dev-local@despegar.com}
+      - AUTH_ADMINS=${AUTH_ADMINS:-}
+      - ATP3_CLIENT_ID=${ATP3_CLIENT_ID:-}
+      - ATP3_CLIENT_SECRET=${ATP3_CLIENT_SECRET:-}
     volumes:
       - ./data:/data
     networks:

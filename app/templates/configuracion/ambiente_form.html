@@ -29,6 +29,21 @@
         <input name="service_name" required value="{{ ambiente.service_name if ambiente else '' }}" placeholder="ej: EBSPRD">
       </div>
     </div>
+    <div class="r2-form-group">
+      <label>Usuario DB</label>
+      <input name="db_user" value="{{ ambiente.db_user if ambiente and ambiente.db_user else '' }}" placeholder="ej: APPS">
+      <small style="color:#78909C;display:block;margin-top:.3rem">
+        La contraseña no se guarda en la aplicación: se lee de los secrets del servidor
+        (variable <code>EBS_DB_PASSWORD_{{ ambiente.password_var.replace('EBS_DB_PASSWORD_', '') if ambiente else '&lt;NOMBRE_AMBIENTE&gt;'|safe }}</code>).
+        {% if ambiente %}
+          {% if ambiente.tiene_credenciales %}
+            <span style="color:#2E7D32">✔ Secret encontrado: el Download Manager no pedirá credenciales.</span>
+          {% else %}
+            <span style="color:#E65100">✘ Secret no encontrado o usuario sin definir: se pedirán a mano.</span>
+          {% endif %}
+        {% endif %}
+      </small>
+    </div>
     <div style="display:flex;gap:.8rem;margin-top:1rem">
       <button type="submit" class="btn-r2 btn-primary">Guardar</button>
       <a href="{{ url_for('configuracion.ambientes') }}" class="btn-r2 btn-outline">Cancelar</a>

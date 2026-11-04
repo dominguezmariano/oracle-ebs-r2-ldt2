@@ -6,6 +6,7 @@ from app.models.tipo_linea import TipoLinea
 from app.models.parametro_ldt import ParametroLdt
 from app.models.aplicacion_ebs import AplicacionEbs
 from app.models.plantilla_ldt import PlantillaLdt
+from app.services import credenciales
 from app.services.oracle_service import OracleService
 from app.services.ldt_service import LdtService
 
@@ -34,6 +35,7 @@ def ambiente_nuevo():
             host=request.form["host"],
             puerto=int(request.form.get("puerto", 1521)),
             service_name=request.form["service_name"],
+            db_user=(request.form.get("db_user") or "").strip() or None,
         )
         db.session.add(amb)
         db.session.commit()
@@ -51,6 +53,7 @@ def ambiente_editar(id):
         amb.host = request.form["host"]
         amb.puerto = int(request.form.get("puerto", 1521))
         amb.service_name = request.form["service_name"]
+        amb.db_user = (request.form.get("db_user") or "").strip() or None
         db.session.commit()
         flash(f'Ambiente "{amb.nombre}" actualizado.', "success")
         return redirect(url_for("configuracion.ambientes"))
@@ -69,8 +72,10 @@ def ambiente_eliminar(id):
 @config_bp.route("/ambientes/<int:id>/test", methods=["POST"])
 def ambiente_test(id):
     amb = Ambiente.query.get_or_404(id)
-    user = request.form.get("test_user")
-    pwd = request.form.get("test_pass")
+    user, pwd, _ = credenciales.resolver(
+        amb, (request.form.get("test_user") or "").strip(), request.form.get("test_pass") or "")
+    if not user:
+        return jsonify({"ok": False, "message": "Sin credenciales: configurá usuario y secret del ambiente."})
     svc = OracleService(amb, user, pwd)
     ok, msg = svc.test_connection()
     return jsonify({"ok": ok, "message": msg})
