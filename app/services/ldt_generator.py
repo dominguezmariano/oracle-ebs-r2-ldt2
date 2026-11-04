@@ -33,9 +33,16 @@ class LdtGenerator:
     # ------------------------------------------------------------------
 
     def generate(self, lct_filename: str, root_params: dict,
-                 connection, language: str = 'US') -> str:
-        """Return LDT file content as a string."""
-        lct_data = self._load_lct(lct_filename)
+                 connection, language: str = 'US',
+                 primary_entity: str = None) -> str:
+        """
+        Return LDT file content as a string.
+
+        primary_entity: para LCTs multi-objeto (ej. afscursp.lct). Si se indica, se emite
+        solo esa entidad más las que referencia (en orden de dependencia), en vez de todas
+        las entidades raíz del LCT.
+        """
+        lct_data = self._load_lct(lct_filename, primary_entity)
         self._set_nls(connection, language)
         source_db = self._get_db_name(connection)
 
@@ -55,6 +62,11 @@ class LdtGenerator:
             '',
             '',
         ]
+
+        if primary_entity:
+            lines.extend(self._fetch_with_references(
+                primary_entity, lct_data, root_params, connection))
+            return '\n'.join(lines)
 
         # Generar datos en el orden de los bloques DOWNLOAD del LCT,
         # que es el orden correcto de dependencias para el instalador.
@@ -92,11 +104,13 @@ class LdtGenerator:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _load_lct(self, filename: str) -> dict:
-        if filename not in self._lct_cache:
+    def _load_lct(self, filename: str, primary_entity: str = None) -> dict:
+        cache_key = (filename, primary_entity)
+        if cache_key not in self._lct_cache:
             path = os.path.join(self.lct_dir, filename)
-            self._lct_cache[filename] = self._parser.parse_file(path)
-        return self._lct_cache[filename]
+            self._lct_cache[cache_key] = self._parser.parse_file(
+                path, primary_entity=primary_entity)
+        return self._lct_cache[cache_key]
 
     def _get_db_name(self, conn) -> str:
         """Return the Oracle instance/DB name for the #Source Database header line."""
@@ -138,14 +152,33 @@ class LdtGenerator:
         except Exception:
             return ['US']
 
+    @staticmethod
+    def _key_values(entity: EntityDef, row: dict) -> list:
+        """
+        Valores de las KEY fields de una fila. Se busca por nombre y, si el SQL usa otro
+        alias (ej. KEY RESP_KEY vs columna RESPONSIBILITY_KEY), se toma por POSICIÓN:
+        FNDLOAD mapea por posición y las KEY son siempre las primeras columnas.
+        """
+        cols = list(row.keys())
+        vals = []
+        for i, f in enumerate(entity.key_fields):
+            if f.name in row:
+                vals.append(row[f.name])
+            else:
+                vals.append(row[cols[i]] if i < len(cols) else None)
+        return vals
+
     def _fetch_entity(self, entity: EntityDef, lct_data: dict,
-                      bind_vars: dict, conn, indent: int) -> list:
+                      bind_vars: dict, conn, indent: int,
+                      row_filter=None) -> list:
         """Recursively fetch and format entity + children."""
         sql = lct_data['downloads'].get(entity.name)
         if not sql:
             return []
 
         rows = self._run_sql(conn, sql, bind_vars)
+        if row_filter:
+            rows = [r for r in rows if row_filter(r)]
         lines = []
         prefix = '  ' * indent
         field_col_map = None
@@ -157,7 +190,7 @@ class LdtGenerator:
                 sql_cols = list(row.keys())
                 field_col_map = self._build_field_col_map(entity, sql_cols, lct_data)
 
-            key_vals = [str(row.get(f.name) or '') for f in entity.key_fields]
+            key_vals = [str(v or '') for v in self._key_values(entity, row)]
             begin_keys = ' '.join(f'"{v}"' for v in key_vals)
             lines.append(f'{prefix}BEGIN {entity.name} {begin_keys}'.rstrip())
 
@@ -179,8 +212,8 @@ class LdtGenerator:
 
             for child in entity.children:
                 child_bind = dict(bind_vars)
-                for fdef in entity.key_fields:
-                    child_bind[fdef.name] = row.get(fdef.name)
+                for fdef, kval in zip(entity.key_fields, self._key_values(entity, row)):
+                    child_bind[fdef.name] = kval
 
                 child_lines = self._fetch_entity(child, lct_data, child_bind, conn, indent + 1)
                 if child_lines:
@@ -188,8 +221,60 @@ class LdtGenerator:
                     lines.extend(child_lines)
 
             lines.append(f'{prefix}END {entity.name}')
-            lines.append('')
+            # FNDLOAD deja la línea en blanco con la sangría del nivel (ver ejemplos reales)
+            lines.append(prefix)
 
+        return lines
+
+    def _fetch_with_references(self, primary: str, lct_data: dict,
+                               root_params: dict, conn) -> list:
+        """
+        Emite la entidad primaria precedida por las entidades que referencia
+        (REFERENCES), en orden de dependencia, como hace FNDLOAD: solo las filas
+        realmente referenciadas, no todas las del LCT.
+        """
+        entities = lct_data['entities']
+        downloads = lct_data['downloads']
+        entity = entities[primary]
+
+        sql = downloads.get(primary)
+        if not sql:
+            raise ValueError(f"El LCT no tiene DOWNLOAD para {primary}")
+        rows = self._run_sql(conn, sql, root_params)
+        if not rows:
+            raise ValueError(f"{primary}: sin resultados para {root_params}")
+
+        # Claves referenciadas por entidad, sin duplicar y en orden de aparición
+        refs: dict = {}
+
+        def collect(ent: EntityDef, ent_rows: list):
+            col_map = self._build_field_col_map(ent, list(ent_rows[0].keys()), lct_data)
+            for row in ent_rows:
+                for fdef in ent.non_key_fields:
+                    if fdef.datatype != 'REFERENCES' or fdef.ref_entity not in entities:
+                        continue
+                    vals = tuple(str(row.get(c) or '') for c in col_map.get(fdef.name, []))
+                    if not vals or not all(vals) or any(v == '*NULL*' for v in vals):
+                        continue
+                    seen = refs.setdefault(fdef.ref_entity, [])
+                    if vals not in seen:
+                        seen.append(vals)
+
+        collect(entity, rows)
+
+        order = list(downloads.keys())
+        lines = []
+        for ref_name in sorted(refs, key=lambda n: order.index(n) if n in order else len(order)):
+            ref_ent = entities[ref_name]
+            key_names = [f.name for f in ref_ent.key_fields]
+            for key_tuple in refs[ref_name]:
+                wanted = tuple(key_tuple)
+                lines.extend(self._fetch_entity(
+                    ref_ent, lct_data, dict(zip(key_names, key_tuple)), conn, 0,
+                    row_filter=lambda r, e=ref_ent, w=wanted: tuple(
+                        str(v or '') for v in self._key_values(e, r)) == w))
+
+        lines.extend(self._fetch_entity(entity, lct_data, root_params, conn, 0))
         return lines
 
     def _build_field_col_map(self, entity: EntityDef, sql_cols: list, lct_data: dict) -> dict:

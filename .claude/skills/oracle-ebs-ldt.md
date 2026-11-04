@@ -121,6 +121,17 @@ El `\n\` es literal (backslash-n-backslash), no un escape Python.
 
 5. **Verificar** generando un archivo real y comparando contra uno producido por FNDLOAD en el servidor (en `ejemplos/fndloads/<tipo>/`).
 
+### LCTs multi-objeto (`_TYPE_PRIMARY_ENTITY`)
+
+Algunos LCT agrupan varios objetos (ej. `afscursp.lct`: usuarios, responsabilidades, aplicaciones, grupos de seguridad…). Con el modo clásico se volcarían TODAS las entidades raíz. Para estos tipos, registrar la entidad que realmente se descarga en `_TYPE_PRIMARY_ENTITY` (`download_manager.py`), p. ej. `'RESPONSIBILITIES': 'FND_RESPONSIBILITY'`. Entonces:
+
+- Se emite solo la primaria y las entidades que referencia (`REFERENCES`), con sus claves exactas y en orden de dependencia (`FND_APPLICATION` antes de `FND_RESPONSIBILITY`).
+- El bloque DEFINE incluye solo las entidades alcanzables y se normaliza al formato de FNDLOAD (sin tabs, sin `AS alias`, `KEY ... REFERENCES X` → tipo de la KEY de X).
+- Sin filas para la primaria → `ValueError` (aparece en `_errores.txt` del ZIP).
+- Las KEY se toman por nombre y, si el SQL usa otro alias (`RESP_KEY` vs `RESPONSIBILITY_KEY`), **por posición**.
+
+Los tipos sin entrada en `_TYPE_PRIMARY_ENTITY` (LOOKUPS, CONCPROG) siguen con el modo clásico, sin cambios.
+
 ---
 
 ## Gotchas frecuentes

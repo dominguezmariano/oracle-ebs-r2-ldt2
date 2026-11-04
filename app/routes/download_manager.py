@@ -36,6 +36,21 @@ _TYPE_KEY_MAP = {
 }
 
 
+# LCTs multi-objeto: entidad que realmente se descarga (el resto de las raíces del LCT
+# se omite; solo se emiten las entidades que ella referencia). Ver LctParser.parse.
+_TYPE_PRIMARY_ENTITY = {
+    'RESPONSIBILITIES': 'FND_RESPONSIBILITY',
+}
+
+_TYPE_KEY_MAP['RESPONSIBILITIES'] = {
+    # afscursp.lct: FND_RESPONSIBILITY RESP_KEY="%OBJECT_NAME%" (igual que la plantilla FNDLOAD:
+    # sin filtro de aplicación ni de data group; DATA_GROUP_NAME nulo => 'Standard')
+    'RESP_KEY': 'OBJ_TYPE',
+    'APPLICATION_SHORT_NAME': None,
+    'DATA_GROUP_NAME': None,
+}
+
+
 def _item_to_lct_params(item: dict) -> dict:
     """Map a getFndObjects item dict to LCT DOWNLOAD bind variables."""
     obj_code = (item.get('OBJ_CODE') or '').upper()
@@ -292,7 +307,9 @@ def generar_ldt():
 
                 for lang in languages:
                     try:
-                        ldt_content = gen.generate(lct_filename, root_params, conn, lang)
+                        ldt_content = gen.generate(
+                            lct_filename, root_params, conn, lang,
+                            primary_entity=_TYPE_PRIMARY_ENTITY.get(obj_code))
                         if filename_template:
                             fname = _render_filename(filename_template, obj_type, app_short, lang)
                         else:
