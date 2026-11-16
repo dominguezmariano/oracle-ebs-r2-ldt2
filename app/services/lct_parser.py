@@ -256,7 +256,9 @@ class LctParser:
         visited = []
 
         def _follow(ent):
-            for fdef in ent.fields:
+            # En modo primaria (afsload.lct) FNDLOAD recorre los REFERENCES del DEFINE
+            # en orden inverso (FUNCTION: OBJECT antes que FORM); el modo clásico no cambia.
+            for fdef in (reversed(ent.fields) if only_reachable else ent.fields):
                 if fdef.datatype == 'REFERENCES' and fdef.ref_entity:
                     ref = fdef.ref_entity
                     if ref not in visited and ref in top_blocks:
@@ -292,23 +294,34 @@ class LctParser:
           - sin la cláusula "AS <alias>" de REFERENCES
           - KEY ... REFERENCES X se expande al tipo de la KEY de X (ej. VARCHAR2(50))
         """
+        # FNDLOAD indenta cada DEFINE hijo 2 espacios más que su padre y, además,
+        # 2 espacios extra por cada hermano que ya imprimió (de ahí la escalera de
+        # ALR_ALERTS). Con un solo hijo coincide con la sangría simple por nivel.
         out = []
-        depth = 0
+        stack = []  # [indent_del_DEFINE, hijos_ya_impresos]
         for raw in text.split('\n'):
             s = raw.strip()
             if not s:
-                out.append('')
+                # el LCT deja blancos donde había comentarios: FNDLOAD no repite blancos
+                if out and out[-1] != '':
+                    out.append('')
                 continue
             m = re.match(r'^DEFINE\s+(\w+)', s)
             if m:
-                out.append('  ' * depth + f'DEFINE {m.group(1)}')
-                depth += 1
+                if stack:
+                    indent = stack[-1][0] + 2 + 2 * stack[-1][1]
+                    stack[-1][1] += 1
+                else:
+                    indent = 0
+                stack.append([indent, 0])
+                out.append(' ' * indent + f'DEFINE {m.group(1)}')
                 continue
             m = re.match(r'^END\s+(\w+)', s)
             if m:
-                depth = max(depth - 1, 0)
-                out.append('  ' * depth + f'END {m.group(1)}')
+                indent = stack.pop()[0] if stack else 0
+                out.append(' ' * indent + f'END {m.group(1)}')
                 continue
+            depth = (stack[-1][0] + 2) // 2 if stack else 0  # sangría de los campos
             m = re.match(r'^(KEY|BASE|TRANS|CTX)\s+(\w+)\s+(.*)$', s)
             if m:
                 kind, name, rest = m.group(1), m.group(2), m.group(3).strip()

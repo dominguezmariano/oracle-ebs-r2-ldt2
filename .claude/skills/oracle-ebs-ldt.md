@@ -130,6 +130,28 @@ Algunos LCT agrupan varios objetos (ej. `afscursp.lct`: usuarios, responsabilida
 - Sin filas para la primaria → `ValueError` (aparece en `_errores.txt` del ZIP).
 - Las KEY se toman por nombre y, si el SQL usa otro alias (`RESP_KEY` vs `RESPONSIBILITY_KEY`), **por posición**.
 
+Tipos registrados hoy: `RESPONSIBILITIES` (`FND_RESPONSIBILITY`, afscursp.lct), `ALERTS` (`ALR_ALERTS`, alr.lct, con 13 entidades hijas anidadas) y `VALUESETS` (`VALUE_SET`, afffload.lct, que también contiene DESC_FLEX/KEY_FLEX/etc. que NO se descargan).
+
+También `MENU` (`MENU`, afsload.lct, ext `.men`), con **cierre transitivo de referencias** (`_TYPE_DEEP_REFERENCES` → `LdtGenerator._fetch_deep`): MENU → ENTRY → submenú/función → form/object. Cada objeto sale ANTES de quien lo referencia (post-orden en profundidad), sin repetir, en el orden de aparición de los REFERENCES (campos del DEFINE; hijos por fila). Una referencia a `*NULL*` también se consulta (existe el menú `*NULL*`, sale primero); si no devuelve filas no se emite. Un menú real grande hace ~2.000 consultas por idioma (de ahí el `--timeout 900` de gunicorn).
+
+`FNDMSGS` (`FND_NEW_MESSAGES`, afmdmsg.lct, `.msg`): entidad única sin referencias; claves `APPLICATION_SHORT_NAME` / `MESSAGE_NAME`. Su SQL filtra `language_code = userenv('LANG')`, por eso depende del `ALTER SESSION NLS_LANGUAGE` de `_set_nls`.
+
+Codificación del ZIP: US en ASCII y ESA/PTB en latin-1 (como el NLS_LANG de las plantillas FNDLOAD); lo que no cabe sale como `?`.
+
+Los hijos se recorren en el orden del DEFINE, que en estos tres LCT coincide con el orden de los bloques DOWNLOAD (así lo hace FNDLOAD). Si un LCT nuevo los tuviera distintos, hay que ordenar por DOWNLOAD.
+
+Cómo verificar un tipo nuevo sin Oracle: servir como "Oracle" los datos de un archivo real (parsear sus bloques BEGIN…END y devolverlos como filas de cada SQL, filtrando por las claves del padre) y comparar la salida. Ojo: solo valida lo que el ejemplo contiene; revisar aparte que cada SQL hijo reciba sus binds (un `AND col = :VAR` con NULL se descarta en `_run_sql`).
+
+**Formato "estricto"** (solo en este modo; verificado contra `.rsp`, `.alr` y `.vls` reales de FNDLOAD):
+
+- DEFINE: los hijos van en orden inverso al DOWNLOAD y cada DEFINE hijo se indenta `padre + 2 + 2 × (hermanos ya impresos)` — de ahí la "escalera" de ALR_ALERTS. Sin blancos repetidos.
+- Valores: se escapa `\` → `\\` y `"` → `\"`. Multilínea: abre `NAME =` / ` "primera\n\`, las continuaciones van en **columna 0**, y si el valor termina en salto de línea el cierre es `" ` (comilla + espacio).
+- Entre tipos de hijo hay una línea en blanco con la **sangría del padre**, también para tipos sin filas; cada fila cierra con una línea en blanco con su propia sangría; el archivo termina con un blanco extra.
+- Los valores largos también se parten aunque no tengan saltos: si `<sangría>NAME = "valor"` (valor sin escapar) mide ≥ 80 caracteres, sale como `NAME =` / ` "valor"`. Medido sobre ~130k líneas reales sin excepciones (la simple más larga mide 79).
+- Una referencia sin ningún valor no se emite (FNDLOAD siempre trae `*NULL*`; solo ocurre con datos simulados).
+- En el bloque DEFINE, los REFERENCES de una entidad se recorren en orden inverso para ordenar las entidades alcanzables (FUNCTION: OBJECT antes que FORM).
+- El nombre del archivo conserva los espacios (`XX AR FE Argentina_ALRT_US.alr`).
+
 Los tipos sin entrada en `_TYPE_PRIMARY_ENTITY` (LOOKUPS, CONCPROG) siguen con el modo clásico, sin cambios.
 
 ---

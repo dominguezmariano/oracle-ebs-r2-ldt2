@@ -40,6 +40,41 @@ _TYPE_KEY_MAP = {
 # se omite; solo se emiten las entidades que ella referencia). Ver LctParser.parse.
 _TYPE_PRIMARY_ENTITY = {
     'RESPONSIBILITIES': 'FND_RESPONSIBILITY',
+    'ALERTS':           'ALR_ALERTS',
+    'VALUESETS':        'VALUE_SET',
+    'MENU':             'MENU',
+    'FNDMSGS':          'FND_NEW_MESSAGES',
+}
+
+_TYPE_KEY_MAP['FNDMSGS'] = {
+    # afmdmsg.lct: FND_NEW_MESSAGES APPLICATION_SHORT_NAME="%APPL_SHORT_NAME%" MESSAGE_NAME="%OBJECT_NAME%"
+    'APPLICATION_SHORT_NAME': 'APP_SHORT_NAME',
+    'MESSAGE_NAME': 'OBJ_TYPE',
+}
+
+# Tipos cuyo archivo incluye el cierre transitivo de referencias (menú -> submenús ->
+# funciones -> forms), cada objeto antes de quien lo referencia.
+_TYPE_DEEP_REFERENCES = {'MENU'}
+
+_TYPE_KEY_MAP['MENU'] = {
+    # afsload.lct: MENU MENU_NAME="%OBJECT_NAME%" (igual que la plantilla FNDLOAD).
+    # PARENT_MENU_NAME / MENU_APP_SHORT_NAME nulos: solo el menú pedido y su árbol.
+    'MENU_NAME': 'OBJ_TYPE',
+    'PARENT_MENU_NAME': None,
+    'MENU_APP_SHORT_NAME': None,
+}
+
+_TYPE_KEY_MAP['VALUESETS'] = {
+    # afffload.lct: VALUE_SET FLEX_VALUE_SET_NAME="%OBJECT_NAME%" (igual que la plantilla FNDLOAD).
+    # afffload.lct también contiene DESC_FLEX, KEY_FLEX, etc.: solo se descarga VALUE_SET.
+    'FLEX_VALUE_SET_NAME': 'OBJ_TYPE',
+}
+
+_TYPE_KEY_MAP['ALERTS'] = {
+    # alr.lct: ALR_ALERTS APPLICATION_SHORT_NAME="%APPL_SHORT_NAME%" ALERT_NAME="%OBJECT_NAME%"
+    # (igual que la plantilla FNDLOAD). Los hijos reciben sus claves del padre.
+    'APPLICATION_SHORT_NAME': 'APP_SHORT_NAME',
+    'ALERT_NAME': 'OBJ_TYPE',
 }
 
 _TYPE_KEY_MAP['RESPONSIBILITIES'] = {
@@ -114,7 +149,9 @@ def _render_filename(template: str, obj_type: str, app_short: str, lang: str) ->
     elif lang != 'US':
         # Replace _US. or _US at end-of-stem with _{lang}
         result = re.sub(r'(?<=[_\-])US(?=[_\-.]|$)', lang, result)
-    return re.sub(r'[^A-Za-z0-9_\-.]', '_', result)
+    # Se conservan los espacios: FNDLOAD nombra el archivo exactamente como se lo piden
+    # (ej. "XX AR FE Argentina_ALRT_US.alr").
+    return re.sub(r'[^A-Za-z0-9_\-. ]', '_', result)
 
 
 def _credenciales(ambiente, data):
@@ -309,12 +346,17 @@ def generar_ldt():
                     try:
                         ldt_content = gen.generate(
                             lct_filename, root_params, conn, lang,
-                            primary_entity=_TYPE_PRIMARY_ENTITY.get(obj_code))
+                            primary_entity=_TYPE_PRIMARY_ENTITY.get(obj_code),
+                            deep_references=obj_code in _TYPE_DEEP_REFERENCES)
                         if filename_template:
                             fname = _render_filename(filename_template, obj_type, app_short, lang)
                         else:
                             fname = f'{safe_name}_{lang}.{ext}'
-                        zf.writestr(fname, ldt_content)
+                        # Mismo juego de caracteres que FNDLOAD según el NLS_LANG de la
+                        # plantilla: US7ASCII para US, WE8ISO8859P1 (latin-1) para ESA/PTB.
+                        # Lo que no cabe se reemplaza por '?', igual que FNDLOAD.
+                        enc = 'ascii' if lang == 'US' else 'latin-1'
+                        zf.writestr(fname, ldt_content.encode(enc, errors='replace'))
                     except Exception as e:
                         errors.append(f"{obj_name} [{lang}]: {e}")
 

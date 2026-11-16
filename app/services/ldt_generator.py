@@ -1,13 +1,19 @@
 import io
 import os
 import re
+import time
+import logging
 import zipfile
 from datetime import datetime
 
 from .lct_parser import EntityDef, LctParser
 
+_log = logging.getLogger(__name__)
 LCT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'lct')
 
+
+class NoRowsError(ValueError):
+    """La entidad primaria no devolvió filas."""
 
 class LdtGenerator:
     """
@@ -27,6 +33,7 @@ class LdtGenerator:
         self.lct_dir = lct_dir or LCT_DIR
         self._parser = LctParser()
         self._lct_cache = {}
+        self._strict = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -34,7 +41,7 @@ class LdtGenerator:
 
     def generate(self, lct_filename: str, root_params: dict,
                  connection, language: str = 'US',
-                 primary_entity: str = None) -> str:
+                 primary_entity: str = None, deep_references: bool = False) -> str:
         """
         Return LDT file content as a string.
 
@@ -42,6 +49,9 @@ class LdtGenerator:
         solo esa entidad más las que referencia (en orden de dependencia), en vez de todas
         las entidades raíz del LCT.
         """
+        # Formato "estricto" (escapado, continuación en columna 0, blancos con sangría)
+        # solo para LCTs multi-objeto; el modo clásico queda exactamente como antes.
+        self._strict = bool(primary_entity)
         lct_data = self._load_lct(lct_filename, primary_entity)
         self._set_nls(connection, language)
         source_db = self._get_db_name(connection)
@@ -64,8 +74,15 @@ class LdtGenerator:
         ]
 
         if primary_entity:
-            lines.extend(self._fetch_with_references(
-                primary_entity, lct_data, root_params, connection))
+            fetch = self._fetch_deep if deep_references else self._fetch_with_references
+            try:
+                lines.extend(fetch(primary_entity, lct_data, root_params, connection))
+            except NoRowsError:
+                # Sin traducción en este idioma: FNDLOAD genera igual el archivo, solo con
+                # las definiciones (ver .msg PTB real). En US sí es un error (no existe).
+                if language == "US":
+                    raise
+            lines.append('')    # los archivos reales terminan con una línea en blanco extra
             return '\n'.join(lines)
 
         # Generar datos en el orden de los bloques DOWNLOAD del LCT,
@@ -170,13 +187,17 @@ class LdtGenerator:
 
     def _fetch_entity(self, entity: EntityDef, lct_data: dict,
                       bind_vars: dict, conn, indent: int,
-                      row_filter=None) -> list:
-        """Recursively fetch and format entity + children."""
+                      row_filter=None, ref_sink=None, rows_override=None) -> list:
+        """Recursively fetch and format entity + children.
+
+        ref_sink: si es una lista, se le agrega (entidad_referenciada, claves) por cada
+        REFERENCES encontrado (en orden de aparición, incluyendo las entidades hijas).
+        """
         sql = lct_data['downloads'].get(entity.name)
         if not sql:
             return []
 
-        rows = self._run_sql(conn, sql, bind_vars)
+        rows = rows_override if rows_override is not None else self._run_sql(conn, sql, bind_vars)
         if row_filter:
             rows = [r for r in rows if row_filter(r)]
         lines = []
@@ -198,6 +219,10 @@ class LdtGenerator:
                 cols = field_col_map.get(fdef.name, [])
                 if fdef.datatype == 'REFERENCES' and fdef.ref_entity:
                     vals = [str(row.get(c) or '') for c in cols]
+                    if ref_sink is not None:
+                        ref_sink.append((fdef.ref_entity, tuple(vals)))
+                    if self._strict and not any(vals):
+                        continue    # referencia sin ningún valor: FNDLOAD no la emite
                     val_str = ' '.join(f'"{v}"' for v in vals)
                     lines.append(f'{prefix}  {fdef.name} = {val_str}')
                 elif cols:
@@ -215,8 +240,14 @@ class LdtGenerator:
                 for fdef, kval in zip(entity.key_fields, self._key_values(entity, row)):
                     child_bind[fdef.name] = kval
 
-                child_lines = self._fetch_entity(child, lct_data, child_bind, conn, indent + 1)
-                if child_lines:
+                child_lines = self._fetch_entity(child, lct_data, child_bind, conn, indent + 1,
+                                                 ref_sink=ref_sink)
+                if self._strict:
+                    # FNDLOAD separa cada TIPO de hijo con un blanco con la sangría del
+                    # padre, aunque ese tipo no tenga filas (ver ALR_ALERTS).
+                    lines.append(prefix)
+                    lines.extend(child_lines)
+                elif child_lines:
                     lines.append('')
                     lines.extend(child_lines)
 
@@ -242,7 +273,7 @@ class LdtGenerator:
             raise ValueError(f"El LCT no tiene DOWNLOAD para {primary}")
         rows = self._run_sql(conn, sql, root_params)
         if not rows:
-            raise ValueError(f"{primary}: sin resultados para {root_params}")
+            raise NoRowsError(f"{primary}: sin resultados para {root_params}")
 
         # Claves referenciadas por entidad, sin duplicar y en orden de aparición
         refs: dict = {}
@@ -276,6 +307,76 @@ class LdtGenerator:
 
         lines.extend(self._fetch_entity(entity, lct_data, root_params, conn, 0))
         return lines
+
+    def _fetch_deep(self, primary: str, lct_data: dict, root_params: dict, conn) -> list:
+        """
+        Cierre transitivo de referencias (menús: MENU -> ENTRY -> submenú/función -> form...).
+
+        FNDLOAD emite cada objeto referenciado ANTES de quien lo referencia (recorrido en
+        profundidad, post-orden), sin repetir, y en el orden en que aparecen los REFERENCES
+        (campos del DEFINE; las entidades hijas en el orden de sus filas). Una referencia a
+        '*NULL*' también se consulta (existe el menú '*NULL*'); si no devuelve filas no se emite.
+        """
+        entities = lct_data['entities']
+        downloads = lct_data['downloads']
+        primary_ent = entities[primary]
+        seen: set = set()
+        out: list = []
+
+        def emit(ent: EntityDef, params: dict, row_filter, key, rows_override=None):
+            sink: list = []
+            lines = self._fetch_entity(ent, lct_data, params, conn, 0,
+                                       row_filter=row_filter, ref_sink=sink,
+                                       rows_override=rows_override)
+            if not lines:
+                return False
+            for ref_name, vals in sink:
+                if ref_name in entities and ref_name in downloads and any(vals):
+                    visit(ref_name, vals)
+            out.extend(lines)
+            return True
+
+        # Carga masiva: una entidad sin hijas (FUNCTION, FORM, OBJECT) que se consulta muchas
+        # veces se trae completa en UNA consulta (todas sus binds nulas) y se indexa por clave.
+        # Un menú grande hace >1.400 consultas de funciones; una por una supera el timeout.
+        BULK_AFTER = 8
+        counts: dict = {}
+        bulk: dict = {}     # entidad -> {claves: [filas]} | None (si la carga masiva falló)
+
+        def bulk_rows(ref_name: str, ref_ent: EntityDef, vals: tuple):
+            counts[ref_name] = counts.get(ref_name, 0) + 1
+            if ref_name not in bulk and counts[ref_name] > BULK_AFTER:
+                try:
+                    index: dict = {}
+                    for r in self._run_sql(conn, downloads[ref_name], {}):
+                        k = tuple(str(v or '') for v in self._key_values(ref_ent, r))
+                        index.setdefault(k, []).append(r)
+                    bulk[ref_name] = index
+                except Exception:
+                    bulk[ref_name] = None
+            index = bulk.get(ref_name)
+            return None if index is None else index.get(vals, [])
+
+        def visit(ref_name: str, vals: tuple):
+            key = (ref_name, vals)
+            if key in seen:
+                return
+            seen.add(key)
+            ref_ent = entities[ref_name]
+            names = [f.name for f in ref_ent.key_fields]
+            emit(ref_ent, dict(zip(names, vals)),
+                 lambda r, e=ref_ent, w=vals: tuple(
+                     str(v or '') for v in self._key_values(e, r)) == w, key,
+                 rows_override=bulk_rows(ref_name, ref_ent, vals))
+
+        # Entidad primaria: puede devolver varias filas (patrón LIKE); se marcan como vistas
+        rows = self._run_sql(conn, downloads[primary], root_params)
+        if not rows:
+            raise NoRowsError(f"{primary}: sin resultados para {root_params}")
+        for r in rows:
+            seen.add((primary, tuple(str(v or '') for v in self._key_values(primary_ent, r))))
+        emit(primary_ent, root_params, None, None, rows_override=rows)
+        return out
 
     def _build_field_col_map(self, entity: EntityDef, sql_cols: list, lct_data: dict) -> dict:
         """
@@ -314,6 +415,8 @@ class LdtGenerator:
         Format a field=value pair, using FNDLOAD multi-line continuation when
         the value contains newlines or is very long.
         """
+        if self._strict:
+            return self._format_value_lines_strict(field_prefix, name, val)
         if '\n' not in val:
             return [f'{field_prefix}{name} = "{val}"']
         # Multi-line: FNDLOAD uses  "line1\n\<newline>  line2\n\<newline>  last"
@@ -329,6 +432,33 @@ class LdtGenerator:
                 out.append(f'  {part}{suffix}')
         # Close the last line with "
         out[-1] += '"'
+        return out
+
+    @staticmethod
+    def _format_value_lines_strict(field_prefix: str, name: str, val: str) -> list:
+        """
+        Formato de valor tal como lo escribe FNDLOAD (verificado contra un .alr real):
+          - se escapan  \\  ->  \\\\   y   "  ->  \\"
+          - un valor multilínea abre con  NAME =  y luego ` "primera\\n\\`
+          - las líneas de continuación van en columna 0 (el texto tal cual)
+          - si el valor termina en salto de línea, el cierre es  `" ` (comilla + espacio)
+        """
+        esc = lambda t: t.replace('\\', '\\\\').replace('"', '\\"')
+        # FNDLOAD también parte los valores largos aunque no tengan saltos de línea:
+        # si la línea `<sangría>NAME = "valor"` (valor sin escapar) llega a 80 caracteres
+        # pasa a la forma multilínea. Medido sobre ~130k líneas de archivos reales:
+        # 0 excepciones (la línea simple más larga mide 79, la multilínea más corta 80).
+        if '\n' not in val and len(field_prefix) + len(name) + len(val) + 5 < 80:
+            return [f'{field_prefix}{name} = "{esc(val)}"']
+        parts = [esc(p) for p in val.split('\n')]
+        out = [f'{field_prefix}{name} =']
+        for i, part in enumerate(parts):
+            last = i == len(parts) - 1
+            if last:
+                line = part + '"' + (' ' if part == '' else '')
+            else:
+                line = part + '\\n\\'
+            out.append(f' "{line}' if i == 0 else line)
         return out
 
     def _run_sql(self, conn, sql: str, bind_vars: dict) -> list:
@@ -361,7 +491,12 @@ class LdtGenerator:
         clean_params = {n: v for n, v in params.items() if n not in stripped_vars}
 
         with conn.cursor() as cur:
+            _t0 = time.monotonic()
             cur.execute(working_sql, clean_params)
+            _dt = time.monotonic() - _t0
+            if _dt > 1.0:
+                _log.warning('consulta lenta (%.1fs): %s | %s', _dt,
+                             ' '.join(working_sql.split())[:90], clean_params)
             # De-duplicate column names: Oracle can return the same column name
             # multiple times (e.g. VALUE_SET selects fvs.flex_value_set_name at col[0]
             # AND fvs_parent.flex_value_set_name at col[15], both named FLEX_VALUE_SET_NAME).
